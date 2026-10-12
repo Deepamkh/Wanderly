@@ -92,14 +92,32 @@ export async function images(title, max = 8) {
   return out;
 }
 
-/** Batch thumbnail lookup (up to 50 titles per request). Returns { [inputTitle]: url }. */
-export async function thumbnails(titles, size = 640) {
-  const unique = [...new Set(titles.filter(Boolean))];
+// Wikimedia serves thumbnails only at these standard widths; any other width fails to load.
+const THUMB_STEPS = [120, 250, 330, 500, 960, 1280];
+export const standardWidth = (w) => THUMB_STEPS.find((s) => s >= w) ?? THUMB_STEPS[THUMB_STEPS.length - 1];
+
+/** English Wikipedia titles for many Wikidata IDs at once (50 per request). Returns { [qid]: title }. */
+export async function enTitlesFromWikidata(qids) {
+  const unique = [...new Set(qids.filter((q) => /^Q\d+$/.test(q || '')))];
   const result = {};
   for (let i = 0; i < unique.length; i += 50) {
     const chunk = unique.slice(i, i + 50);
+    const url = `https://www.wikidata.org/w/api.php?action=wbgetentities&props=sitelinks&sitefilter=enwiki&format=json&ids=${chunk.join('|')}`;
+    const d = await fetchJson(url, { ttl: 7 * DAY });
+    for (const [id, e] of Object.entries(d.entities || {})) if (e.sitelinks?.enwiki?.title) result[id] = e.sitelinks.enwiki.title;
+  }
+  return result;
+}
+
+/** Batch thumbnail lookup (up to 50 titles per request). Returns { [inputTitle]: url }. */
+export async function thumbnails(titles, size = 500) {
+  const unique = [...new Set(titles.filter(Boolean))];
+  const result = {};
+  const width = standardWidth(size);
+  for (let i = 0; i < unique.length; i += 50) {
+    const chunk = unique.slice(i, i + 50);
     const url =
-      `${wp()}/w/api.php?action=query&prop=pageimages&piprop=thumbnail&pithumbsize=${size}` +
+      `${wp()}/w/api.php?action=query&prop=pageimages&piprop=thumbnail&pithumbsize=${width}` +
       `&redirects=1&format=json&titles=${encodeURIComponent(chunk.join('|'))}`;
     const d = await fetchJson(url, { ttl: DAY });
     const q = d.query || {};

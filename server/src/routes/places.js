@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { geocode, nearby, nearbyAll } from '../services/osm.js';
-import { resolveTitle, summary, images, history, travelTips, thumbnails, parseWikiTag } from '../services/wiki.js';
+import { resolveTitle, summary, images, history, travelTips, thumbnails, parseWikiTag, enTitlesFromWikidata } from '../services/wiki.js';
 
 const router = Router();
 const num = (v) => (v === undefined || v === '' ? NaN : Number(v));
@@ -76,12 +76,22 @@ router.get('/details', async (req, res, next) => {
   }
 });
 
+// Photo for each attraction card: from its English Wikipedia article, found directly from the
+// OSM `wikipedia` tag or, for places that only link to Wikidata, through Wikidata.
 async function addAttractionPhotos(items) {
-  const titles = items.map((p) => parseWikiTag(p.wikipedia)).filter((t) => t?.lang === 'en').map((t) => t.title);
-  const thumbs = await thumbnails(titles, 480).catch(() => ({}));
-  for (const p of items) {
+  const enTitle = (p) => {
     const t = parseWikiTag(p.wikipedia);
-    p.image = t?.lang === 'en' ? thumbs[t.title] || null : null;
+    return t?.lang === 'en' ? t.title : null;
+  };
+  const needWd = items.filter((p) => !enTitle(p) && p.wikidata).map((p) => p.wikidata);
+  const fromWd = await enTitlesFromWikidata(needWd).catch(() => ({}));
+  const titleOf = (p) => enTitle(p) || fromWd[p.wikidata] || null;
+
+  const thumbs = await thumbnails(items.map(titleOf), 500).catch(() => ({}));
+  for (const p of items) {
+    const title = titleOf(p);
+    p.image = title ? thumbs[title] || null : null;
+    if (title && !enTitle(p)) p.wikipedia = `en:${title}`; // better details page when clicked
   }
 }
 

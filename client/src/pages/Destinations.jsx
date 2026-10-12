@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Compass, Search, X } from 'lucide-react';
 import { api, exploreUrl, titleCase } from '../lib/api.js';
+import CardPhoto from '../components/CardPhoto.jsx';
 
 const TINTS = ['#ffe3ec', '#e8ddff', '#dff4ff', '#e2f8ec', '#fff2db'];
 
@@ -120,7 +121,9 @@ export default function Destinations() {
             whileHover={{ y: -6 }}
             onClick={() => navigate(exploreUrl({ name: d.name, lat: d.lat, lon: d.lon, wikipedia: `en:${d.wiki}`, isArea: true }))}
           >
-            <div className="city-img" style={d.image ? { backgroundImage: `url("${d.image}")` } : undefined} />
+            <div className="city-img">
+              <CardPhoto src={d.image} alt={d.name} />
+            </div>
             <div className="city-body">
               <span className="dest-region">{d.region}</span>
               <h3>{d.name}</h3>

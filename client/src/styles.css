@@ -301,7 +301,9 @@ img { max-width: 100%; }
 .dest-count { color: var(--muted); font-weight: 700; }
 .dest-region { font-size: .74rem; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: var(--lilac-d); }
 .city-card.skeleton { min-height: 300px; }
-.city-img { height: 140px; background: var(--tint, #f3ecff) center/cover no-repeat; position: relative; }
+.city-img { height: 140px; background: var(--tint, #f3ecff); position: relative; overflow: hidden; }
+.card-photo { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
+.city-rank, .chip-float { z-index: 1; }
 .city-rank {
   position: absolute; top: 10px; left: 10px; background: rgba(255,255,255,.92); border-radius: 99px; padding: 3px 10px;
   font-family: var(--display); font-weight: 700; color: var(--lilac-d);
@@ -402,8 +404,8 @@ input[type='range']::-moz-range-thumb { width: 16px; height: 16px; border-radius
 .attr-card { background: #fff; border-radius: 18px; overflow: hidden; border: 1px solid var(--line); display: flex; flex-direction: column; transition: transform .2s, box-shadow .2s; }
 .attr-card:hover { transform: translateY(-4px); box-shadow: var(--shadow); }
 .attr-img {
-  height: 130px; border: 0; padding: 0; background: var(--grad-soft) center/cover no-repeat; position: relative;
-  display: grid; place-items: center; color: var(--lilac-d);
+  height: 130px; border: 0; padding: 0; background: var(--grad-soft); position: relative; overflow: hidden;
+  display: grid; place-items: center; color: var(--lilac-d); width: 100%;
 }
 .chip-float { position: absolute; left: 10px; bottom: 10px; background: rgba(255,255,255,.92); }
 .attr-body { padding: 12px 14px 10px; display: flex; flex-direction: column; gap: 4px; flex: 1; }
@@ -418,7 +420,9 @@ input[type='range']::-moz-range-thumb { width: 16px; height: 16px; border-radius
 .toggle .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--f); border: 2px solid var(--c); }
 .toggle.on { opacity: 1; border-color: var(--c); background: color-mix(in srgb, var(--f) 30%, #fff); }
 .toggle small { color: var(--muted); }
-.leaflet-box { height: 440px; border-radius: 18px; overflow: hidden; border: 1px solid var(--line); z-index: 0; }
+.leaflet-box { height: 440px; border-radius: 18px; overflow: hidden; border: 1px solid var(--line); z-index: 0; background: #f3f0f8; }
+/* Soften the standard OpenStreetMap tiles into the pastel palette (markers stay full colour). */
+.leaflet-box .pastel-tiles { filter: saturate(0.65) brightness(1.06) hue-rotate(-8deg) contrast(0.92); }
 
 /* food & POI lists */
 .cuisine-best { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; margin-bottom: 14px; }

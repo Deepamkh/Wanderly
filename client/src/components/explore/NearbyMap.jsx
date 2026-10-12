@@ -2,6 +2,10 @@ import { useEffect } from 'react';
 import { MapContainer, TileLayer, Circle, CircleMarker, Tooltip, useMap } from 'react-leaflet';
 import L from 'leaflet';
 
+const TILE_URL = import.meta.env.VITE_TILE_URL || 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+const TILE_ATTRIBUTION =
+  import.meta.env.VITE_TILE_ATTRIBUTION || '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
+
 export const LAYERS = {
   attractions: { label: 'Attractions', color: '#9b7be0', fill: '#d7b8ff' },
   food: { label: 'Food', color: '#e58a5b', fill: '#ffd8a8' },
@@ -28,12 +32,12 @@ export default function NearbyMap({ center, radius, layers, visible, onToggle })
         ))}
       </div>
       <MapContainer center={[center.lat, center.lon]} zoom={14} scrollWheelZoom={false} className="leaflet-box">
-        {/* CARTO Voyager basemap on OpenStreetMap data – free with attribution */}
+        {/* OpenStreetMap's own tiles: free, no API key, attribution required. Swap via VITE_TILE_URL. */}
         <TileLayer
-          url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
-          subdomains="abcd"
-          maxZoom={20}
+          url={TILE_URL}
+          attribution={TILE_ATTRIBUTION}
+          className="pastel-tiles"
+          maxZoom={19}
         />
         <FitRadius center={center} radius={radius} />
         <Circle center={[center.lat, center.lon]} radius={radius} pathOptions={{ color: '#c9a8ff', weight: 2, dashArray: '6 6', fillColor: '#efe6ff', fillOpacity: 0.25 }} />

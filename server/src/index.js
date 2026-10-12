@@ -25,13 +25,13 @@ app.get('/api/health', (_req, res) => res.json({ ok: true, llm: llmProvider() })
 app.get('/api/cities/pins', (_req, res) => res.json(GLOBE_PINS));
 
 app.get('/api/cities/top', async (_req, res) => {
-  const thumbs = await thumbnails(TOP_CITIES.map((c) => c.wiki), 800).catch(() => ({}));
+  const thumbs = await thumbnails(TOP_CITIES.map((c) => c.wiki), 500).catch(() => ({}));
   res.json({ source: TOP_CITIES_SOURCE, cities: TOP_CITIES.map((c) => ({ ...c, image: thumbs[c.wiki] || null })) });
 });
 
 // 100 travel destinations for the Explore page, with Wikipedia photos (batched, cached 24 h).
 app.get('/api/destinations', async (_req, res) => {
-  const thumbs = await thumbnails(DESTINATIONS.map((d) => d.wiki), 640).catch(() => ({}));
+  const thumbs = await thumbnails(DESTINATIONS.map((d) => d.wiki), 500).catch(() => ({}));
   res.json({
     regions: REGIONS,
     tags: TAGS,

@@ -15,7 +15,7 @@ using **only free and open-source data, imagery, libraries and AI models** — n
 | Nearest restaurants per cuisine | Overpass `amenity=restaurant/cafe/…` grouped by the `cuisine` tag, veg filter |
 | Nearest washrooms | Overpass `amenity=toilets` (free/paid, wheelchair, baby change) |
 | Parking spots | Overpass `amenity=parking` (type, fee, capacity) |
-| Map of everything nearby | `react-leaflet` + OSM data on CARTO Voyager tiles, layer toggles |
+| Map of everything nearby | `react-leaflet` + OpenStreetMap tiles (no API key) with a pastel tint, layer toggles |
 | Top reviews | Community reviews stored by the app (JSON file) with "helpful" voting |
 | Tips | **Wikivoyage** sections (Stay safe, Get around, Respect, …) |
 | History & details | **Wikipedia** summary + History section |
@@ -114,8 +114,8 @@ These services are free because the community runs them — please be a good cit
   For heavy traffic self-host Nominatim or use Photon.
 * **Overpass** – the server limits concurrency to 2 and rotates between mirrors; results are cached 6 h.
   For production traffic, run your own Overpass instance (Docker image available).
-* **Map tiles** – CARTO basemaps are free for low/moderate use with attribution. For scale, self-host tiles
-  (e.g. OpenMapTiles / Protomaps PMTiles) and change the URL in `NearbyMap.jsx`.
+* **Map tiles** – OpenStreetMap's standard tiles are free for light use with attribution (no API key). For scale, self-host tiles
+  (e.g. OpenMapTiles / Protomaps PMTiles) and set `VITE_TILE_URL` (and `VITE_TILE_ATTRIBUTION`) when building the client.
 * **Wikipedia / Wikivoyage / Commons** – content is CC BY-SA; attribution links are shown in the UI.
 
 ## ℹ️ Notes & limitations

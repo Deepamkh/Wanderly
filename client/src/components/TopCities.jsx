@@ -2,6 +2,7 @@ import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { Users } from 'lucide-react';
 import { exploreUrl } from '../lib/api.js';
+import CardPhoto from './CardPhoto.jsx';
 
 const TINTS = ['#ffe3ec', '#e8ddff', '#dff4ff', '#e2f8ec', '#fff2db'];
 
@@ -31,7 +32,8 @@ export default function TopCities({ cities = [], source, onHover }) {
             onMouseLeave={() => onHover?.(null)}
             onClick={() => navigate(exploreUrl({ ...c, isArea: true, wikipedia: `en:${c.wiki}` }))}
           >
-            <div className="city-img" style={c.image ? { backgroundImage: `url("${c.image}")` } : undefined}>
+            <div className="city-img">
+              <CardPhoto src={c.image} alt={c.name} />
               <span className="city-rank">#{c.rank}</span>
             </div>
             <div className="city-body">

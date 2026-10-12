@@ -6,6 +6,7 @@ import {
   Info, Bus, ShieldCheck, HeartPulse, Hand, Wrench, MessageCircle, Wallet, BookOpen, ExternalLink,
 } from 'lucide-react';
 import { exploreUrl, fmtDist, walkMins, titleCase, directionsUrl } from '../../lib/api.js';
+import CardPhoto from '../CardPhoto.jsx';
 
 export function Section({ id, icon: Icon, title, subtitle, children, tint }) {
   return (
@@ -61,11 +62,10 @@ export function Attractions({ state, center, city }) {
           >
             <button
               className="attr-img"
-              style={a.image ? { backgroundImage: `url("${a.image}")` } : undefined}
               onClick={() => navigate(exploreUrl({ ...a, city }))}
               aria-label={`Explore ${a.name}`}
             >
-              {!a.image && <Landmark size={30} />}
+              <CardPhoto src={a.image} alt={a.name} fallback={<Landmark size={30} />} />
               <span className="chip chip-float">{titleCase(a.category)}</span>
             </button>
             <div className="attr-body">
