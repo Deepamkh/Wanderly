@@ -6,6 +6,7 @@ import Navbar from './components/Navbar.jsx';
 import Home from './pages/Home.jsx';
 import Explore from './pages/Explore.jsx';
 import Destinations from './pages/Destinations.jsx';
+import Nearby from './pages/Nearby.jsx';
 import Planner from './pages/Planner.jsx';
 
 // The intro plays once per browser: on the first visit, and only when that visit lands on the home page.
@@ -50,6 +51,7 @@ export default function App() {
           <Route path="/" element={<Home ready={introDone} />} />
           <Route path="/destinations" element={<Destinations />} />
           <Route path="/explore" element={<Explore />} />
+          <Route path="/nearby" element={<Nearby />} />
           <Route path="/planner" element={<Planner />} />
           <Route path="*" element={<Home ready={introDone} />} />
         </Routes>

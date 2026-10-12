@@ -70,6 +70,9 @@ export default function Explore() {
     );
 
   const city = data.place.isArea ? data.title : data.place.city;
+  // Full-list page for restaurants / washrooms / parking ("View all").
+  const viewAll = (kind) =>
+    `/nearby?${new URLSearchParams({ kind, lat: center.lat, lon: center.lon, radius, name: data.title, back: params.toString() })}`;
 
   return (
     <main className="explore">
@@ -109,16 +112,16 @@ export default function Explore() {
             </Suspense>
           </Section>
 
-          <Section id="food" icon={Utensils} title="Restaurants by cuisine" subtitle={`Within ${Math.min(radius, 5000) / 1000} km`} tint="#fff4e8">
-            <Food state={food} center={center} />
+          <Section id="food" icon={Utensils} title="Restaurants by cuisine" subtitle={`Nearest 5 within ${Math.min(radius, 5000) / 1000} km`} tint="#fff4e8">
+            <Food state={food} center={center} limit={5} viewAllHref={viewAll('food')} />
           </Section>
 
           <div className="two-col">
-            <Section id="washrooms" icon={Bath} title="Nearest washrooms" subtitle={`Within ${Math.min(radius, 3000) / 1000} km`} tint="#ecfbf3">
-              <Washrooms state={toilets} center={center} />
+            <Section id="washrooms" icon={Bath} title="Nearest washrooms" subtitle={`Nearest 5 within ${Math.min(radius, 3000) / 1000} km`} tint="#ecfbf3">
+              <Washrooms state={toilets} center={center} limit={5} viewAllHref={viewAll('toilets')} />
             </Section>
-            <Section id="parking" icon={Car} title="Parking spots" subtitle={`Within ${Math.min(radius, 5000) / 1000} km`} tint="#eef6ff">
-              <Parking state={parking} center={center} />
+            <Section id="parking" icon={Car} title="Parking spots" subtitle={`Nearest 5 within ${Math.min(radius, 5000) / 1000} km`} tint="#eef6ff">
+              <Parking state={parking} center={center} limit={5} viewAllHref={viewAll('parking')} />
             </Section>
           </div>
 

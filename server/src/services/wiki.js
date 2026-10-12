@@ -1,9 +1,52 @@
 // Wikipedia, Wikivoyage and Wikidata helpers (free, CC BY-SA content – attribute on the UI).
-import { fetchJson } from '../utils/http.js';
+import { fetchJson, createLimiter } from '../utils/http.js';
 
 const DAY = 24 * 3_600_000;
 const wp = (lang = 'en') => `https://${lang}.wikipedia.org`;
 const WV = 'https://en.wikivoyage.org';
+const COMMONS = 'https://commons.wikimedia.org';
+const commonsLimit = createLimiter(4);
+
+/**
+ * Wikipedia articles near a point that have a photo – one call (plus a few continuations).
+ * Returns [{ title, lat, lon, thumb }]. Used to find photos for attractions with no wiki link.
+ */
+export async function nearbyArticles(lat, lon, radius) {
+  const r = Math.round(Math.min(10000, Math.max(100, radius))); // geosearch maximum is 10 km
+  const base =
+    `${wp()}/w/api.php?action=query&format=json&generator=geosearch&ggscoord=${lat}|${lon}&ggsradius=${r}` +
+    `&ggslimit=250&prop=pageimages|coordinates&piprop=thumbnail&pithumbsize=500&pilimit=max&colimit=max`;
+  const pages = new Map();
+  let cont = '';
+  for (let round = 0; round < 6; round++) {
+    const d = await fetchJson(base + cont, { ttl: DAY, timeout: 12_000 });
+    for (const p of Object.values(d.query?.pages || {})) {
+      const prev = pages.get(p.pageid) || { title: p.title };
+      if (p.thumbnail) prev.thumb = p.thumbnail.source;
+      if (p.coordinates?.[0]) Object.assign(prev, { lat: p.coordinates[0].lat, lon: p.coordinates[0].lon });
+      pages.set(p.pageid, prev);
+    }
+    if (!d.continue) break;
+    cont = Object.entries(d.continue).map(([k, v]) => `&${k}=${encodeURIComponent(v)}`).join('');
+  }
+  return [...pages.values()].filter((p) => p.thumb && p.lat != null);
+}
+
+/** A photo taken right at a spot, from Wikimedia Commons (geotagged files within ~120 m). */
+export async function commonsPhotoNear(lat, lon) {
+  const url =
+    `${COMMONS}/w/api.php?action=query&format=json&generator=geosearch&ggsnamespace=6&ggscoord=${lat}|${lon}` +
+    `&ggsradius=120&ggslimit=8&prop=imageinfo&iiprop=url|size|mime&iiurlwidth=500`;
+  const d = await commonsLimit(() => fetchJson(url, { ttl: 7 * DAY, timeout: 8000 }));
+  const files = Object.values(d.query?.pages || {})
+    .sort((a, b) => (a.index ?? 0) - (b.index ?? 0)) // nearest first
+    .filter((p) => !JUNK_IMG.test(p.title) && !/\.(svg|gif|tiff?|pdf|webm|ogv)$/i.test(p.title));
+  for (const p of files) {
+    const ii = p.imageinfo?.[0];
+    if (ii && ii.width >= 400 && /^image\/(jpeg|png|webp)$/.test(ii.mime)) return ii.thumburl || ii.url;
+  }
+  return null;
+}
 
 export function parseWikiTag(tag) {
   if (!tag) return null;

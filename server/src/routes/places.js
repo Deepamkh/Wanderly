@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { geocode, nearby, nearbyAll } from '../services/osm.js';
-import { resolveTitle, summary, images, history, travelTips, thumbnails, parseWikiTag, enTitlesFromWikidata } from '../services/wiki.js';
+import { resolveTitle, summary, images, history, travelTips } from '../services/wiki.js';
+import { addAttractionPhotos } from '../services/photos.js';
 
 const router = Router();
 const num = (v) => (v === undefined || v === '' ? NaN : Number(v));
@@ -76,25 +77,6 @@ router.get('/details', async (req, res, next) => {
   }
 });
 
-// Photo for each attraction card: from its English Wikipedia article, found directly from the
-// OSM `wikipedia` tag or, for places that only link to Wikidata, through Wikidata.
-async function addAttractionPhotos(items) {
-  const enTitle = (p) => {
-    const t = parseWikiTag(p.wikipedia);
-    return t?.lang === 'en' ? t.title : null;
-  };
-  const needWd = items.filter((p) => !enTitle(p) && p.wikidata).map((p) => p.wikidata);
-  const fromWd = await enTitlesFromWikidata(needWd).catch(() => ({}));
-  const titleOf = (p) => enTitle(p) || fromWd[p.wikidata] || null;
-
-  const thumbs = await thumbnails(items.map(titleOf), 500).catch(() => ({}));
-  for (const p of items) {
-    const title = titleOf(p);
-    p.image = title ? thumbs[title] || null : null;
-    if (title && !enTitle(p)) p.wikipedia = `en:${title}`; // better details page when clicked
-  }
-}
-
 // GET /api/places/nearby-all?lat=..&lon=..&radius=5000
 // Attractions, food, washrooms and parking in ONE upstream request (radius is capped per kind).
 router.get('/nearby-all', async (req, res, next) => {
@@ -104,7 +86,7 @@ router.get('/nearby-all', async (req, res, next) => {
     if (!Number.isFinite(lat) || !Number.isFinite(lon)) return res.status(400).json({ error: 'lat & lon required' });
     const radius = Math.round(Math.min(20000, Math.max(200, num(req.query.radius) || 2000)));
     const data = await nearbyAll(lat, lon, radius);
-    await addAttractionPhotos(data.attractions);
+    await addAttractionPhotos(data.attractions, data.center, radius);
     res.set('Cache-Control', data.stale ? 'no-store' : 'public, max-age=600');
     res.json(data);
   } catch (e) {
@@ -122,7 +104,7 @@ router.get('/nearby', async (req, res, next) => {
     const kind = String(req.query.kind || 'attractions');
     const data = await nearby(lat, lon, radius, kind);
 
-    if (kind === 'attractions') await addAttractionPhotos(data.items);
+    if (kind === 'attractions') await addAttractionPhotos(data.items, data.center, radius);
     res.json(data);
   } catch (e) {
     next(e);

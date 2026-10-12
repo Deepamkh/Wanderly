@@ -1,9 +1,9 @@
-import { useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useMemo, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
   Landmark, Navigation, Clock, Accessibility, Leaf, Baby, Coins, Car, ParkingSquare, Bath, Utensils, Globe2,
-  Info, Bus, ShieldCheck, HeartPulse, Hand, Wrench, MessageCircle, Wallet, BookOpen, ExternalLink,
+  Info, Bus, ShieldCheck, HeartPulse, Hand, Wrench, MessageCircle, Wallet, BookOpen, ExternalLink, ArrowRight,
 } from 'lucide-react';
 import { exploreUrl, fmtDist, walkMins, titleCase, directionsUrl } from '../../lib/api.js';
 import CardPhoto from '../CardPhoto.jsx';
@@ -93,11 +93,21 @@ export function Attractions({ state, center, city }) {
 }
 
 // ---------------- Food by cuisine ----------------
-const FOOD_VISIBLE = 10;
 const KIND_LABEL = { restaurant: 'Restaurant', cafe: 'Café', fast_food: 'Fast food', food_court: 'Food court', pub: 'Pub', bar: 'Bar', ice_cream: 'Ice cream' };
 
-export function Food({ state, center }) {
-  const [cuisine, setCuisine] = useState('all');
+/** "View all" link under a shortened list. */
+function ViewAll({ href, total, noun }) {
+  if (!href) return null;
+  return (
+    <Link className="view-all" to={href}>
+      View all {total} {noun} <ArrowRight size={16} />
+    </Link>
+  );
+}
+
+// `limit` shows only the nearest N (city page); without it the full list is shown (View all page).
+export function Food({ state, center, limit, viewAllHref, initialCuisine = 'all' }) {
+  const [cuisine, setCuisine] = useState(initialCuisine || 'all');
   const [veg, setVeg] = useState(false);
   const cuisines = state.cuisines || [];
   const list = useMemo(
@@ -109,32 +119,13 @@ export function Food({ state, center }) {
       ),
     [state.items, cuisine, veg],
   );
-
-  // Show the 10 nearest; the rest are reachable by scrolling inside the list.
-  const listRef = useRef(null);
-  const [maxH, setMaxH] = useState(null);
-  const [atEnd, setAtEnd] = useState(false);
-  useLayoutEffect(() => {
-    const ul = listRef.current;
-    if (!ul) return;
-    ul.scrollTop = 0;
-    setAtEnd(false);
-    const measure = () => {
-      const rows = ul.children;
-      if (rows.length <= FOOD_VISIBLE) return setMaxH(null);
-      const last = rows[FOOD_VISIBLE - 1];
-      setMaxH(last.offsetTop + last.offsetHeight + 6);
-    };
-    measure();
-    window.addEventListener('resize', measure);
-    return () => window.removeEventListener('resize', measure);
-  }, [list, state.loading]);
-
   const block = StateBlock({ state, empty: 'No restaurants mapped in this radius yet.' });
   if (block) return block;
 
   // Nearest place for each of the top cuisines.
   const best = cuisines.slice(0, 8).filter((c) => c.name !== 'other').map((c) => ({ c, r: state.items.find((r) => r.cuisines.includes(c.name)) })).filter((x) => x.r);
+  const shown = limit ? list.slice(0, limit) : list;
+  const href = viewAllHref && `${viewAllHref}${cuisine !== 'all' ? `&cuisine=${encodeURIComponent(cuisine)}` : ''}`;
 
   return (
     <>
@@ -150,7 +141,7 @@ export function Food({ state, center }) {
 
       <div className="chip-row">
         <button className={`chip-btn ${cuisine === 'all' ? 'on' : ''}`} onClick={() => setCuisine('all')}>All ({state.items.length})</button>
-        {cuisines.slice(0, 18).map((c) => (
+        {cuisines.slice(0, limit ? 18 : 60).map((c) => (
           <button key={c.name} className={`chip-btn ${cuisine === c.name ? 'on' : ''}`} onClick={() => setCuisine(c.name)}>
             {titleCase(c.name)} ({c.count})
           </button>
@@ -158,24 +149,8 @@ export function Food({ state, center }) {
         <button className={`chip-btn mint ${veg ? 'on' : ''}`} onClick={() => setVeg((v) => !v)}><Leaf size={13} /> Veg-friendly</button>
       </div>
 
-      {list.length > FOOD_VISIBLE && (
-        <p className="list-caption">
-          Showing the {FOOD_VISIBLE} nearest · <strong>scroll the list to see all {list.length}</strong>
-        </p>
-      )}
-      <div className={`poi-scroll ${maxH && !atEnd ? 'has-more' : ''}`}>
-      <ul
-        ref={listRef}
-        className="poi-list scrollable"
-        style={maxH ? { maxHeight: maxH } : undefined}
-        tabIndex={maxH ? 0 : undefined}
-        aria-label={`Restaurants, ${list.length} results`}
-        onScroll={(e) => {
-          const el = e.currentTarget;
-          setAtEnd(el.scrollTop + el.clientHeight >= el.scrollHeight - 8);
-        }}
-      >
-        {list.map((r) => (
+      <ul className="poi-list">
+        {shown.map((r) => (
           <li key={r.id} className="poi">
             <span className="poi-icon peach"><Utensils size={16} /></span>
             <div className="poi-main">
@@ -199,70 +174,78 @@ export function Food({ state, center }) {
           </li>
         ))}
       </ul>
-      </div>
       {!list.length && <p className="notice">Nothing matches these filters.</p>}
+      {limit && list.length > limit && <ViewAll href={href} total={list.length} noun={list.length === 1 ? 'restaurant' : 'restaurants'} />}
     </>
   );
 }
 
 // ---------------- Washrooms ----------------
-export function Washrooms({ state, center }) {
+export function Washrooms({ state, center, limit, viewAllHref }) {
   const block = StateBlock({ state, empty: 'No public washrooms are mapped here. Cafés, malls and museums are your best bet.' });
   if (block) return block;
+  const shown = limit ? state.items.slice(0, limit) : state.items;
   return (
-    <ul className="poi-list">
-      {state.items.slice(0, 15).map((t, i) => (
-        <li key={t.id} className={`poi ${i === 0 ? 'poi-highlight' : ''}`}>
-          <span className="poi-icon mint"><Bath size={16} /></span>
-          <div className="poi-main">
-            <strong>{i === 0 ? `Nearest: ${t.name}` : t.name}</strong>
-            <span className="tags">
-              {t.fee === 'no' && <span className="chip mint">Free</span>}
-              {t.fee === 'yes' && <span className="chip peach"><Coins size={12} /> Paid</span>}
-              {t.wheelchair === 'yes' && <span className="chip sky"><Accessibility size={12} /> Wheelchair</span>}
-              {t.changingTable && <span className="chip lilac"><Baby size={12} /> Baby change</span>}
-              {t.unisex && <span className="chip">Unisex</span>}
-              {t.openingHours && <span className="chip"><Clock size={12} /> {t.openingHours}</span>}
-            </span>
-          </div>
-          <div className="poi-side">
-            <span className="dist">{fmtDist(t.distance)}</span>
-            <Dir from={center} to={t} />
-          </div>
-        </li>
-      ))}
-    </ul>
+    <>
+      <ul className="poi-list">
+        {shown.map((t, i) => (
+          <li key={t.id} className={`poi ${i === 0 ? 'poi-highlight' : ''}`}>
+            <span className="poi-icon mint"><Bath size={16} /></span>
+            <div className="poi-main">
+              <strong>{i === 0 ? `Nearest: ${t.name}` : t.name}</strong>
+              <span className="tags">
+                {t.fee === 'no' && <span className="chip mint">Free</span>}
+                {t.fee === 'yes' && <span className="chip peach"><Coins size={12} /> Paid</span>}
+                {t.wheelchair === 'yes' && <span className="chip sky"><Accessibility size={12} /> Wheelchair</span>}
+                {t.changingTable && <span className="chip lilac"><Baby size={12} /> Baby change</span>}
+                {t.unisex && <span className="chip">Unisex</span>}
+                {t.openingHours && <span className="chip"><Clock size={12} /> {t.openingHours}</span>}
+              </span>
+            </div>
+            <div className="poi-side">
+              <span className="dist">{fmtDist(t.distance)}</span>
+              <Dir from={center} to={t} />
+            </div>
+          </li>
+        ))}
+      </ul>
+      {limit && state.items.length > limit && <ViewAll href={viewAllHref} total={state.items.length} noun="washrooms" />}
+    </>
   );
 }
 
 // ---------------- Parking ----------------
 const PARK_TYPE = { surface: 'Open lot', 'multi-storey': 'Multi-storey', underground: 'Underground', street_side: 'Street-side', lane: 'On-street', rooftop: 'Rooftop', motorcycle: 'Motorcycle' };
 
-export function Parking({ state, center }) {
+export function Parking({ state, center, limit, viewAllHref }) {
   const block = StateBlock({ state, empty: 'No public parking mapped in this radius.' });
   if (block) return block;
+  const shown = limit ? state.items.slice(0, limit) : state.items;
   return (
-    <ul className="poi-list">
-      {state.items.slice(0, 15).map((p) => (
-        <li key={p.id} className="poi">
-          <span className="poi-icon sky">{p.parkingType === 'motorcycle' ? <ParkingSquare size={16} /> : <Car size={16} />}</span>
-          <div className="poi-main">
-            <strong>{p.name}</strong>
-            <span className="tags">
-              {p.parkingType && <span className="chip sky">{PARK_TYPE[p.parkingType] || titleCase(p.parkingType)}</span>}
-              {p.fee === 'no' && <span className="chip mint">Free</span>}
-              {p.fee === 'yes' && <span className="chip peach"><Coins size={12} /> Paid</span>}
-              {p.capacity && <span className="chip">{p.capacity} spaces</span>}
-              {p.openingHours && <span className="chip"><Clock size={12} /> {p.openingHours}</span>}
-            </span>
-          </div>
-          <div className="poi-side">
-            <span className="dist">{fmtDist(p.distance)}</span>
-            <Dir from={center} to={p} />
-          </div>
-        </li>
-      ))}
-    </ul>
+    <>
+      <ul className="poi-list">
+        {shown.map((p) => (
+          <li key={p.id} className="poi">
+            <span className="poi-icon sky">{p.parkingType === 'motorcycle' ? <ParkingSquare size={16} /> : <Car size={16} />}</span>
+            <div className="poi-main">
+              <strong>{p.name}</strong>
+              <span className="tags">
+                {p.parkingType && <span className="chip sky">{PARK_TYPE[p.parkingType] || titleCase(p.parkingType)}</span>}
+                {p.fee === 'no' && <span className="chip mint">Free</span>}
+                {p.fee === 'yes' && <span className="chip peach"><Coins size={12} /> Paid</span>}
+                {p.capacity && <span className="chip">{p.capacity} spaces</span>}
+                {p.openingHours && <span className="chip"><Clock size={12} /> {p.openingHours}</span>}
+              </span>
+            </div>
+            <div className="poi-side">
+              <span className="dist">{fmtDist(p.distance)}</span>
+              <Dir from={center} to={p} />
+            </div>
+          </li>
+        ))}
+      </ul>
+      {limit && state.items.length > limit && <ViewAll href={viewAllHref} total={state.items.length} noun="parking spots" />}
+    </>
   );
 }
 
