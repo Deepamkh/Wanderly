@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
@@ -93,6 +93,7 @@ export function Attractions({ state, center, city }) {
 }
 
 // ---------------- Food by cuisine ----------------
+const FOOD_VISIBLE = 10;
 const KIND_LABEL = { restaurant: 'Restaurant', cafe: 'Café', fast_food: 'Fast food', food_court: 'Food court', pub: 'Pub', bar: 'Bar', ice_cream: 'Ice cream' };
 
 export function Food({ state, center }) {
@@ -108,6 +109,27 @@ export function Food({ state, center }) {
       ),
     [state.items, cuisine, veg],
   );
+
+  // Show the 10 nearest; the rest are reachable by scrolling inside the list.
+  const listRef = useRef(null);
+  const [maxH, setMaxH] = useState(null);
+  const [atEnd, setAtEnd] = useState(false);
+  useLayoutEffect(() => {
+    const ul = listRef.current;
+    if (!ul) return;
+    ul.scrollTop = 0;
+    setAtEnd(false);
+    const measure = () => {
+      const rows = ul.children;
+      if (rows.length <= FOOD_VISIBLE) return setMaxH(null);
+      const last = rows[FOOD_VISIBLE - 1];
+      setMaxH(last.offsetTop + last.offsetHeight + 6);
+    };
+    measure();
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, [list, state.loading]);
+
   const block = StateBlock({ state, empty: 'No restaurants mapped in this radius yet.' });
   if (block) return block;
 
@@ -136,8 +158,24 @@ export function Food({ state, center }) {
         <button className={`chip-btn mint ${veg ? 'on' : ''}`} onClick={() => setVeg((v) => !v)}><Leaf size={13} /> Veg-friendly</button>
       </div>
 
-      <ul className="poi-list">
-        {list.slice(0, 40).map((r) => (
+      {list.length > FOOD_VISIBLE && (
+        <p className="list-caption">
+          Showing the {FOOD_VISIBLE} nearest · <strong>scroll the list to see all {list.length}</strong>
+        </p>
+      )}
+      <div className={`poi-scroll ${maxH && !atEnd ? 'has-more' : ''}`}>
+      <ul
+        ref={listRef}
+        className="poi-list scrollable"
+        style={maxH ? { maxHeight: maxH } : undefined}
+        tabIndex={maxH ? 0 : undefined}
+        aria-label={`Restaurants, ${list.length} results`}
+        onScroll={(e) => {
+          const el = e.currentTarget;
+          setAtEnd(el.scrollTop + el.clientHeight >= el.scrollHeight - 8);
+        }}
+      >
+        {list.map((r) => (
           <li key={r.id} className="poi">
             <span className="poi-icon peach"><Utensils size={16} /></span>
             <div className="poi-main">
@@ -161,6 +199,7 @@ export function Food({ state, center }) {
           </li>
         ))}
       </ul>
+      </div>
       {!list.length && <p className="notice">Nothing matches these filters.</p>}
     </>
   );

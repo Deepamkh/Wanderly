@@ -432,6 +432,22 @@ input[type='range']::-moz-range-thumb { width: 16px; height: 16px; border-radius
 .cuisine-tile strong { font-size: .95rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cuisine-tile small { color: var(--muted); }
 .poi-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
+/* Scrollable list (restaurants): height fits the first 10 rows, the rest scroll inside. */
+.poi-scroll { position: relative; }
+.poi-list.scrollable {
+  position: relative; overflow-y: auto; overscroll-behavior: contain; padding-right: 8px;
+  scrollbar-width: thin; scrollbar-color: var(--lilac) transparent;
+}
+.poi-list.scrollable::-webkit-scrollbar { width: 8px; }
+.poi-list.scrollable::-webkit-scrollbar-thumb { background: var(--lilac); border-radius: 99px; }
+.poi-list.scrollable::-webkit-scrollbar-track { background: transparent; }
+.poi-list.scrollable:focus-visible { outline: 2px solid var(--lilac); outline-offset: 4px; border-radius: 12px; }
+.poi-scroll.has-more::after {
+  content: ''; position: absolute; left: 0; right: 8px; bottom: 0; height: 56px; pointer-events: none;
+  background: linear-gradient(to bottom, rgba(255, 255, 255, 0), #fff 85%); border-radius: 0 0 16px 16px;
+}
+.list-caption { margin: 0 0 10px; font-size: .88rem; color: var(--muted); }
+.list-caption strong { color: var(--peach-d); }
 .poi { display: flex; gap: 12px; align-items: center; background: #fff; border: 1px solid var(--line); border-radius: 16px; padding: 10px 12px; }
 .poi-highlight { border-color: var(--mint); background: #f4fdf8; }
 .poi-icon { width: 36px; height: 36px; border-radius: 12px; display: grid; place-items: center; flex: none; }
