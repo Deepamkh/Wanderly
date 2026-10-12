@@ -59,6 +59,9 @@ export async function geocode(q, limit = 6) {
 // ---------------- Overpass ----------------
 
 export const KINDS = ['attractions', 'food', 'toilets', 'parking'];
+// Attractions now come from Wikipedia (fast, ranked by popularity – see attractions.js); the
+// Overpass query only fetches amenities, which keeps it light. OSM attractions remain a fallback.
+export const AMENITY_KINDS = ['food', 'toilets', 'parking'];
 export const BUCKETS = [1000, 2000, 5000, 10000, 20000];
 // Food, washrooms and parking are only useful within walking/short-drive distance, so their radius is
 // capped. Smaller areas also make the query much faster in dense cities (work grows with area).
@@ -86,14 +89,14 @@ function classify(tags = {}) {
   return 'attractions';
 }
 
-/** One combined query for all four kinds – a quarter of the load on the free servers. */
-function buildQuery(lat, lon, radius) {
+/** One combined query for several kinds (default: the three amenity kinds). */
+function buildQuery(lat, lon, radius, kinds = AMENITY_KINDS) {
   const around = (k) => `around:${Math.min(radius, CAPS[k])},${lat},${lon}`;
   // `qt` skips sorting the output by ID (faster); a short server-side timeout fails fast so we can
   // fall back to another mirror instead of waiting.
   return (
     `[out:json][timeout:25];` +
-    KINDS.map((k, i) => `(${QUERIES[k](around(k))})->.s${i};.s${i} out center tags qt ${LIMITS[k]};`).join('')
+    kinds.map((k, i) => `(${QUERIES[k](around(k))})->.s${i};.s${i} out center tags qt ${LIMITS[k]};`).join('')
   );
 }
 
@@ -317,16 +320,16 @@ export const bucketFor = (r) => BUCKETS.find((b) => b >= r) ?? BUCKETS[BUCKETS.l
 
 function filterTo(data, radius) {
   const res = {};
-  for (const k of KINDS) {
+  for (const k of AMENITY_KINDS) {
     const r = Math.min(radius, CAPS[k]);
-    res[k] = data[k].filter((p) => p.distance <= r);
+    res[k] = (data[k] || []).filter((p) => p.distance <= r);
   }
   return res;
 }
 
 /**
- * All four kinds of nearby places around a point.
- * Returns { center, radius, stale, attractions, food, toilets, parking } – each a list sorted for display.
+ * Restaurants, washrooms and parking around a point (one Overpass request, cached per area).
+ * Returns { center, radius, stale, food, toilets, parking } – each a list sorted nearest first.
  */
 export async function nearbyAll(lat, lon, radius) {
   lat = round4(lat);
@@ -367,11 +370,26 @@ export async function nearbyAll(lat, lon, radius) {
   }
 }
 
-/** Single-kind helper kept for the planner and older clients. */
+/** Single-kind helper for older clients (amenities only; attractions come from attractions.js). */
 export async function nearby(lat, lon, radius, kind) {
-  if (!KINDS.includes(kind)) throw Object.assign(new Error(`Unknown kind "${kind}"`), { status: 400, expose: true });
+  if (!AMENITY_KINDS.includes(kind)) throw Object.assign(new Error(`Unknown kind "${kind}"`), { status: 400, expose: true });
   const all = await nearbyAll(lat, lon, radius);
   return { kind, radius, center: all.center, count: all[kind].length, items: all[kind] };
+}
+
+// ---- OSM attractions: fallback for places Wikipedia covers poorly (cached per area) ----
+const osmAttrCache = new Map();
+export async function osmAttractions(lat, lon, radius) {
+  lat = round4(lat);
+  lon = round4(lon);
+  const key = `${lat},${lon},${bucketFor(radius)}`;
+  const hit = osmAttrCache.get(key);
+  if (hit && Date.now() - hit.at < FRESH_MS) return hit.items;
+  const raw = await overpass(buildQuery(lat, lon, bucketFor(radius), ['attractions']));
+  const items = organise(raw.elements || [], lat, lon).attractions;
+  osmAttrCache.set(key, { at: Date.now(), items });
+  if (osmAttrCache.size > 300) osmAttrCache.delete(osmAttrCache.keys().next().value);
+  return items;
 }
 
 /**

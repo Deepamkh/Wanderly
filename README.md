@@ -11,7 +11,7 @@ using **only free and open-source data, imagery, libraries and AI models** — n
 | Search cities / attractions | **OpenStreetMap Nominatim** geocoding with autocomplete |
 | Top 10 most visited cities | Euromonitor *Top 100 City Destinations Index 2025* (international arrivals) + Wikipedia thumbnails |
 | Header photo gallery | **Wikipedia / Wikimedia Commons** media |
-| Top attractions + adjustable radius | **OSM Overpass API** (`tourism`, `historic`, …) ranked by popularity & distance, 0.5–20 km slider |
+| Top attractions + adjustable radius | **Wikipedia GeoSearch** with photos, ranked by 30-day article views (real popularity); OpenStreetMap fallback for remote areas |
 | Nearest restaurants per cuisine | Overpass `amenity=restaurant/cafe/…` grouped by the `cuisine` tag, veg filter |
 | Nearest washrooms | Overpass `amenity=toilets` (free/paid, wheelchair, baby change) |
 | Parking spots | Overpass `amenity=parking` (type, fee, capacity) |

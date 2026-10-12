@@ -1,35 +1,6 @@
 // Photos for attraction cards, from free Wikimedia sources.
 import { thumbnails, parseWikiTag, enTitlesFromWikidata, nearbyArticles, commonsPhotoNear } from './wiki.js';
-import { nearbyAll, bucketFor, persistAreaCache } from './osm.js';
 import { haversine } from '../utils/http.js';
-
-// Photos are looked up once per area and stored on the cached place objects, so later
-// requests for the same area (and the saved cache file) already include them.
-const photoDone = new Set();
-const photoFlights = new Map();
-
-/** { [attractionId]: { image, wikipedia } } for an area. Places load first; this fills photos in after. */
-export async function photosForArea(lat, lon, radius) {
-  const data = await nearbyAll(lat, lon, radius);
-  const key = `${data.center.lat},${data.center.lon},${bucketFor(radius)}`;
-  if (!photoDone.has(key)) {
-    if (!photoFlights.has(key)) {
-      photoFlights.set(
-        key,
-        addAttractionPhotos(data.attractions, data.center, radius)
-          .then(() => {
-            photoDone.add(key);
-            persistAreaCache();
-          })
-          .finally(() => photoFlights.delete(key)),
-      );
-    }
-    await photoFlights.get(key);
-  }
-  const photos = {};
-  for (const p of data.attractions) if (p.image) photos[p.id] = { image: p.image, wikipedia: p.wikipedia };
-  return photos;
-}
 
 const normName = (s) =>
   String(s || '')

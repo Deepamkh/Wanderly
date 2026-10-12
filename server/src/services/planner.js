@@ -1,6 +1,7 @@
 // AI trip planner. Grounds the LLM with real OpenStreetMap places, and falls back to a
 // deterministic "smart planner" when no model is reachable, so the feature always works for free.
 import { geocode, nearbyAll } from './osm.js';
+import { getAttractions } from './attractions.js';
 import { chatJSON, llmProvider } from './llm.js';
 import { bearing, haversine } from '../utils/http.js';
 
@@ -10,13 +11,15 @@ const PACE_SLOTS = {
   packed: ['08:30', '10:30', '14:30', '16:30'],
 };
 
+// Interest → attraction categories (Wikipedia categories from attractions.js, plus OSM ones for fallback areas).
 const INTEREST_CATEGORIES = {
-  history: ['museum', 'castle', 'palace', 'monument', 'memorial', 'ruins', 'archaeological_site', 'fort', 'city_gate'],
-  art: ['gallery', 'museum', 'artwork'],
-  nature: ['park', 'garden', 'nature_reserve', 'viewpoint'],
-  family: ['zoo', 'aquarium', 'theme_park', 'park'],
-  culture: ['place of worship', 'museum', 'monument', 'attraction'],
-  photography: ['viewpoint', 'attraction', 'monument'],
+  history: ['historic site', 'palace / castle', 'monument', 'museum', 'castle', 'palace', 'memorial', 'ruins', 'archaeological_site', 'fort', 'city_gate'],
+  art: ['museum', 'gallery', 'theatre', 'artwork'],
+  nature: ['park', 'nature', 'garden', 'nature_reserve', 'viewpoint'],
+  family: ['family', 'park', 'zoo', 'aquarium', 'theme_park'],
+  culture: ['church', 'mosque', 'temple', 'synagogue', 'museum', 'theatre', 'market', 'place of worship', 'attraction'],
+  photography: ['tower', 'bridge', 'square', 'fountain', 'viewpoint', 'landmark', 'nature'],
+  shopping: ['market', 'square'],
 };
 
 function addDays(iso, n) {
@@ -46,13 +49,12 @@ function clampInput(body) {
 async function groundingData(destination) {
   const [place] = await geocode(destination, 1);
   if (!place) return { place: null, attractions: [], food: [] };
-  // One combined request; shares the cache with the city page.
-  const all = await nearbyAll(place.lat, place.lon, place.isArea ? 10000 : 5000).catch(() => null);
-  return {
-    place,
-    attractions: all?.attractions || [],
-    food: (all?.food || []).filter((f) => f.distance <= 4000),
-  };
+  // Same sources and caches as the city page: Wikipedia attractions + OSM restaurants, in parallel.
+  const [attr, near] = await Promise.all([
+    getAttractions(place.lat, place.lon, place.isArea ? 10000 : 5000).catch(() => null),
+    nearbyAll(place.lat, place.lon, 3000).catch(() => null),
+  ]);
+  return { place, attractions: attr?.items || [], food: near?.food || [] };
 }
 
 // ---------- deterministic fallback ----------
@@ -61,7 +63,7 @@ export function smartPlan(input, { place, attractions, food }) {
   const name = place?.name || input.destination;
   const wanted = new Set(input.interests.flatMap((i) => INTEREST_CATEGORIES[i.toLowerCase()] || []));
   const pool = [...attractions]
-    .map((a) => ({ ...a, score: (a.wikipedia ? 2 : 0) + (wanted.has(a.category) ? 3 : 0) - a.distance / 5000 }))
+    .map((a) => ({ ...a, score: Math.log10((a.views || 0) + 10) + (wanted.has(a.category) ? 1.5 : 0) - a.distance / 5000 }))
     .sort((x, y) => y.score - x.score);
 
   const slots = PACE_SLOTS[input.pace];

@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { geocode, nearby, nearbyAll } from '../services/osm.js';
 import { resolveTitle, summary, images, history, travelTips } from '../services/wiki.js';
-import { addAttractionPhotos, photosForArea } from '../services/photos.js';
+import { getAttractions } from '../services/attractions.js';
 
 const router = Router();
 const num = (v) => (v === undefined || v === '' ? NaN : Number(v));
@@ -78,14 +78,13 @@ router.get('/details', async (req, res, next) => {
 });
 
 // GET /api/places/nearby-all?lat=..&lon=..&radius=5000
-// Attractions, food, washrooms and parking in ONE upstream request (radius is capped per kind).
+// Restaurants, washrooms and parking in ONE Overpass request (radius is capped per kind).
 router.get('/nearby-all', async (req, res, next) => {
   try {
     const lat = num(req.query.lat);
     const lon = num(req.query.lon);
     if (!Number.isFinite(lat) || !Number.isFinite(lon)) return res.status(400).json({ error: 'lat & lon required' });
     const radius = Math.round(Math.min(20000, Math.max(200, num(req.query.radius) || 2000)));
-    // Respond as soon as the places are known; photos come from /attraction-photos.
     const data = await nearbyAll(lat, lon, radius);
     res.set('Cache-Control', data.stale ? 'no-store' : 'public, max-age=300');
     res.json(data);
@@ -94,15 +93,15 @@ router.get('/nearby-all', async (req, res, next) => {
   }
 });
 
-// GET /api/places/attraction-photos?lat=..&lon=..&radius=5000  →  { photos: { [id]: { image, wikipedia } } }
-router.get('/attraction-photos', async (req, res, next) => {
+// GET /api/places/attractions?lat=..&lon=..&radius=5000  →  top attractions with photos (Wikipedia)
+router.get('/attractions', async (req, res, next) => {
   try {
     const lat = num(req.query.lat);
     const lon = num(req.query.lon);
     if (!Number.isFinite(lat) || !Number.isFinite(lon)) return res.status(400).json({ error: 'lat & lon required' });
     const radius = Math.round(Math.min(20000, Math.max(200, num(req.query.radius) || 2000)));
-    res.set('Cache-Control', 'public, max-age=3600');
-    res.json({ photos: await photosForArea(lat, lon, radius) });
+    res.set('Cache-Control', 'public, max-age=1800');
+    res.json(await getAttractions(lat, lon, radius));
   } catch (e) {
     next(e);
   }
@@ -116,10 +115,12 @@ router.get('/nearby', async (req, res, next) => {
     if (!Number.isFinite(lat) || !Number.isFinite(lon)) return res.status(400).json({ error: 'lat & lon required' });
     const radius = Math.round(Math.min(20000, Math.max(200, num(req.query.radius) || 2000)));
     const kind = String(req.query.kind || 'attractions');
-    const data = await nearby(lat, lon, radius, kind);
-
-    if (kind === 'attractions') await addAttractionPhotos(data.items, data.center, radius);
-    res.json(data);
+    if (kind === 'attractions') {
+      const a = await getAttractions(lat, lon, radius);
+      const items = a.items.filter((p) => p.distance <= radius);
+      return res.json({ kind, radius, center: a.center, count: items.length, items });
+    }
+    res.json(await nearby(lat, lon, radius, kind));
   } catch (e) {
     next(e);
   }
