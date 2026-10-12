@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { fetchJson, haversine, createRateGate, createLimiter, sleep } from '../utils/http.js';
-import { geoapifyAmenities, geoapifyKey } from './geoapify.js';
+import { geoapifyAmenities, geoapifyKey, geoapifyGeocode, geoapifyAttractionElements } from './geoapify.js';
 
 const NOMINATIM = () => process.env.NOMINATIM_URL || 'https://nominatim.openstreetmap.org';
 
@@ -49,7 +49,19 @@ function mapNominatim(r) {
   };
 }
 
-export async function geocode(q, limit = 6) {
+/**
+ * Place search. `prefer: 'geoapify'` uses Geoapify when a key is set (faster, no 1-per-second limit,
+ * 1 credit) and falls back to Nominatim. The search box keeps Nominatim to save credits.
+ */
+export async function geocode(q, limit = 6, { prefer } = {}) {
+  if (prefer === 'geoapify' && geoapifyKey()) {
+    try {
+      const hits = await geoapifyGeocode(q, limit);
+      if (hits.length) return hits;
+    } catch (e) {
+      console.warn(`[geoapify] geocoding failed (${e.status || e.name}); using Nominatim`);
+    }
+  }
   const url =
     `${NOMINATIM()}/search?format=jsonv2&addressdetails=1&extratags=1&namedetails=1` +
     `&accept-language=en&limit=${limit}&q=${encodeURIComponent(q)}`;
@@ -400,8 +412,16 @@ export async function osmAttractions(lat, lon, radius) {
   const key = `${lat},${lon},${bucketFor(radius)}`;
   const hit = osmAttrCache.get(key);
   if (hit && Date.now() - hit.at < FRESH_MS) return hit.items;
-  const raw = await overpass(buildQuery(lat, lon, bucketFor(radius), ['attractions']));
-  const items = organise(raw.elements || [], lat, lon).attractions;
+  let elements = null;
+  if (geoapifyKey()) {
+    try {
+      elements = await geoapifyAttractionElements(lat, lon, bucketFor(radius));
+    } catch (e) {
+      console.warn(`[geoapify] attractions failed (${e.status || e.name}); using Overpass`);
+    }
+  }
+  if (!elements) elements = (await overpass(buildQuery(lat, lon, bucketFor(radius), ['attractions']))).elements || [];
+  const items = organise(elements, lat, lon).attractions;
   osmAttrCache.set(key, { at: Date.now(), items });
   if (osmAttrCache.size > 300) osmAttrCache.delete(osmAttrCache.keys().next().value);
   return items;

@@ -127,6 +127,9 @@ These services are free because the community runs them — please be a good cit
 3. Each new area uses about 20 credits (cached for 12 hours), so the free 3,000 daily credits cover roughly
    150 new areas a day. If Geoapify is unavailable or over quota, Wanderly falls back to the public Overpass servers.
 4. Lists show "Powered by Geoapify", as the free plan requires.
+5. The same key also speeds up the **AI trip planner**: it finds the destination with Geoapify geocoding
+   (1 credit) and uses Geoapify for backup attractions where Wikipedia has little coverage.
+   The search box suggestions stay on the free Nominatim service to save credits.
 
 ## ℹ️ Notes & limitations
 

@@ -109,3 +109,79 @@ export async function geoapifyAmenities(lat, lon, caps, signal) {
   );
   return results.flat();
 }
+
+// ---------------- Geocoding (planner destination lookup) ----------------
+
+const AREA_RESULT_TYPES = new Set(['city', 'county', 'state', 'country', 'suburb', 'district', 'postcode']);
+
+/** Same shape as the Nominatim results in osm.js, so callers can use either. 1 credit per call. */
+export async function geoapifyGeocode(q, limit = 1) {
+  const key = geoapifyKey();
+  if (!key) throw new Error('No GEOAPIFY_API_KEY');
+  const url =
+    `https://api.geoapify.com/v1/geocode/search?text=${encodeURIComponent(q)}` +
+    `&format=json&lang=en&limit=${limit}&apiKey=${encodeURIComponent(key)}`;
+  const d = await fetchJson(url, { ttl: 24 * 3_600_000, timeout: 8000 });
+  return (d.results || [])
+    .filter((r) => Number.isFinite(r.lat) && Number.isFinite(r.lon))
+    .map((r) => {
+      const name = r.name || r.city || r.address_line1 || r.formatted || q;
+      const city = r.city && r.city !== name ? r.city : null;
+      return {
+        id: r.place_id ? `geoapify/${r.place_id}` : `geoapify/${r.lat},${r.lon}`,
+        name,
+        displayName: r.formatted || name,
+        lat: r.lat,
+        lon: r.lon,
+        category: r.category || null,
+        type: r.result_type || null,
+        addressType: r.result_type || null,
+        country: r.country || null,
+        city,
+        wikipedia: null,
+        wikidata: null,
+        isArea: AREA_RESULT_TYPES.has(r.result_type),
+        importance: r.rank?.importance ?? r.rank?.confidence ?? 0,
+      };
+    });
+}
+
+// ---------------- Attractions (backup where Wikipedia has little coverage) ----------------
+
+const ATTRACTION_CATEGORIES = 'tourism.attraction,tourism.sights,entertainment.museum,entertainment.culture,heritage,leisure.park';
+
+/** Give Geoapify sights the OSM-style tags our attraction code reads (tourism / historic / leisure). */
+function attractionTags(tags, cats) {
+  if (tags.tourism || tags.historic || tags.leisure) return tags;
+  // Most specific matching category (e.g. "tourism.sights.castle" rather than "tourism.sights").
+  const has = (prefix) =>
+    cats.filter((c) => c === prefix || c.startsWith(`${prefix}.`)).sort((a, b) => b.length - a.length)[0];
+  const sight = has('tourism.sights');
+  if (cats.some((c) => c.startsWith('entertainment.museum'))) tags.tourism = 'museum';
+  else if (cats.some((c) => c.startsWith('entertainment.culture.gallery'))) tags.tourism = 'gallery';
+  else if (has('tourism.attraction.viewpoint')) tags.tourism = 'viewpoint';
+  else if (sight && /castle|fort|palace|ruines|ruins|memorial|monument|archaeological|city_gate|city_hall/.test(sight)) {
+    tags.historic = sight.split('.').pop().replace('ruines', 'ruins');
+  } else if (sight && /place_of_worship/.test(sight)) tags.amenity = 'place_of_worship';
+  else if (has('leisure.park')) tags.leisure = 'park';
+  else if (has('heritage')) tags.historic = 'monument';
+  else tags.tourism = 'attraction';
+  return tags;
+}
+
+/** Sights around a point as Overpass-style elements (named places only). ~1 credit per 20 results. */
+export async function geoapifyAttractionElements(lat, lon, radius) {
+  const key = geoapifyKey();
+  if (!key) throw new Error('No GEOAPIFY_API_KEY');
+  const url =
+    `${BASE}?categories=${ATTRACTION_CATEGORIES}&conditions=named&filter=circle:${lon},${lat},${Math.round(radius)}` +
+    `&bias=proximity:${lon},${lat}&limit=80&lang=en&apiKey=${encodeURIComponent(key)}`;
+  const d = await fetchJson(url, { ttl: 0, timeout: 12_000 });
+  return (d.features || [])
+    .map((f) => {
+      const el = featureToElement(f);
+      el.tags = attractionTags(el.tags, f.properties?.categories || []);
+      return el;
+    })
+    .filter((e) => e.tags.name && Number.isFinite(e.lat) && Number.isFinite(e.lon));
+}

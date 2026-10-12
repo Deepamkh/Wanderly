@@ -47,7 +47,7 @@ function clampInput(body) {
 }
 
 async function groundingData(destination) {
-  const [place] = await geocode(destination, 1);
+  const [place] = await geocode(destination, 1, { prefer: 'geoapify' });
   if (!place) return { place: null, attractions: [], food: [] };
   // Same sources and caches as the city page: Wikipedia attractions + OSM restaurants, in parallel.
   const [attr, near] = await Promise.all([
