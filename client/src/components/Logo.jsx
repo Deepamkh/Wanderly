@@ -1,43 +1,24 @@
-import { useId } from 'react';
-import { motion } from 'framer-motion';
+import { TEX } from '../lib/textures.js';
 
-/** Wanderly mark: pastel globe + flight path + paper plane. `animated` draws it in. */
-export default function Logo({ size = 40, animated = false }) {
-  const id = useId().replace(/:/g, '');
-  const draw = (delay = 0) =>
-    animated
-      ? { initial: { pathLength: 0, opacity: 0 }, animate: { pathLength: 1, opacity: 1 }, transition: { duration: 1, delay, ease: 'easeInOut' } }
-      : {};
+// Flight path in a 64×64 box: starts low on the left, arcs over the Earth, ends high on the right.
+const ARC = 'M3 46 C 2 18, 40 2, 61 16';
+const scalePath = (d, k) => d.replace(/-?\d+(\.\d+)?/g, (n) => (Number(n) * k).toFixed(2));
 
+/**
+ * Wanderly mark: a slowly rotating Earth (real NASA Blue Marble imagery) with a paper plane
+ * flying left → right along its orbit. `intro` plays the flight + trail-drawing animation once.
+ */
+export default function Logo({ size = 40, intro = false }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 64 64" role="img" aria-label="Wanderly logo">
-      <defs>
-        <linearGradient id={`g-${id}`} x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#b9f3d8" />
-          <stop offset="1" stopColor="#a9c9ff" />
-        </linearGradient>
-      </defs>
-      <motion.circle
-        cx="30" cy="34" r="20" fill={`url(#g-${id})`}
-        {...(animated ? { initial: { scale: 0 }, animate: { scale: 1 }, transition: { type: 'spring', stiffness: 140, damping: 12 } } : {})}
-        style={{ transformOrigin: '30px 34px' }}
-      />
-      <g fill="none" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" opacity=".9">
-        <motion.path d="M10 34H50" {...draw(0.3)} />
-        <motion.path d="M30 14C20 22 20 46 30 54" {...draw(0.4)} />
-        <motion.path d="M30 14C40 22 40 46 30 54" {...draw(0.4)} />
-        <motion.path d="M13.5 24.5C22 28 38 28 46.5 24.5" {...draw(0.5)} />
-        <motion.path d="M13.5 43.5C22 40 38 40 46.5 43.5" {...draw(0.5)} />
-      </g>
-      <motion.path d="M7 47C3 26 26 5 50 12" fill="none" stroke="#ffb3c7" strokeWidth="2.4" strokeLinecap="round" {...draw(0.7)} />
-      <motion.g
-        {...(animated
-          ? { initial: { x: -38, y: 30, opacity: 0, rotate: -30 }, animate: { x: 0, y: 0, opacity: 1, rotate: 0 }, transition: { delay: 0.9, duration: 0.9, ease: 'easeOut' } }
-          : {})}
-      >
-        <path d="M47 5L62 8L52 19L50.5 12.5Z" fill="#d7b8ff" />
-        <path d="M50.5 12.5L62 8" stroke="#fff" strokeWidth="1.2" />
-      </motion.g>
-    </svg>
+    <span className={`logo ${intro ? 'logo-intro' : ''}`} style={{ '--size': `${size}px` }} role="img" aria-label="Wanderly logo">
+      <span className="logo-earth" style={{ backgroundImage: `url("${TEX.day}")` }} />
+      <svg className="logo-orbit" viewBox="0 0 64 64" aria-hidden="true">
+        <path className="logo-arc" d={ARC} pathLength="1" />
+      </svg>
+      <svg className="logo-plane" viewBox="0 0 24 24" aria-hidden="true" style={{ offsetPath: `path("${scalePath(ARC, size / 64)}")` }}>
+        <path d="M2 4 L22 12 L2 20 L6.5 12 Z" fill="#d7b8ff" stroke="#9b7be0" strokeWidth="1.2" strokeLinejoin="round" />
+        <path d="M6.5 12 H22" stroke="#fff" strokeWidth="1.3" />
+      </svg>
+    </span>
   );
 }

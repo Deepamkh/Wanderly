@@ -3,9 +3,9 @@ import { Routes, Route, useLocation } from 'react-router-dom';
 import { AnimatePresence } from 'framer-motion';
 import Intro from './components/Intro.jsx';
 import Navbar from './components/Navbar.jsx';
-import Footer from './components/Footer.jsx';
 import Home from './pages/Home.jsx';
 import Explore from './pages/Explore.jsx';
+import Destinations from './pages/Destinations.jsx';
 import Planner from './pages/Planner.jsx';
 
 export default function App() {
@@ -22,11 +22,11 @@ export default function App() {
         <Navbar />
         <Routes>
           <Route path="/" element={<Home ready={introDone} />} />
+          <Route path="/destinations" element={<Destinations />} />
           <Route path="/explore" element={<Explore />} />
           <Route path="/planner" element={<Planner />} />
           <Route path="*" element={<Home ready={introDone} />} />
         </Routes>
-        <Footer />
       </div>
     </>
   );

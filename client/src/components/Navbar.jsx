@@ -10,7 +10,7 @@ export default function Navbar() {
         <span>Wanderly</span>
       </Link>
       <nav className="nav-links">
-        <NavLink to="/" end><Compass size={17} /> <span>Explore</span></NavLink>
+        <NavLink to="/destinations"><Compass size={17} /> <span>Explore</span></NavLink>
         <NavLink to="/planner" className="nav-cta"><Sparkles size={17} /> <span>AI Trip Planner</span></NavLink>
       </nav>
     </header>

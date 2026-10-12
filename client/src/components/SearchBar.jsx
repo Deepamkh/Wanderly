@@ -46,6 +46,7 @@ export default function SearchBar({ large = false, placeholder = 'Search a city 
     setOpen(false);
     if (item) navigate(exploreUrl(item));
     else if (q.trim()) navigate(`/explore?q=${encodeURIComponent(q.trim())}`);
+    else navigate('/destinations'); // empty search → browse all 100 travel options
   };
 
   const onKey = (e) => {

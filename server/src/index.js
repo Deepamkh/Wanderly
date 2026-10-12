@@ -11,6 +11,7 @@ import { planTrip } from './services/planner.js';
 import { llmProvider } from './services/llm.js';
 import { thumbnails } from './services/wiki.js';
 import { TOP_CITIES, TOP_CITIES_SOURCE, GLOBE_PINS } from './data/cities.js';
+import { DESTINATIONS, REGIONS, TAGS } from './data/destinations.js';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -26,6 +27,16 @@ app.get('/api/cities/pins', (_req, res) => res.json(GLOBE_PINS));
 app.get('/api/cities/top', async (_req, res) => {
   const thumbs = await thumbnails(TOP_CITIES.map((c) => c.wiki), 800).catch(() => ({}));
   res.json({ source: TOP_CITIES_SOURCE, cities: TOP_CITIES.map((c) => ({ ...c, image: thumbs[c.wiki] || null })) });
+});
+
+// 100 travel destinations for the Explore page, with Wikipedia photos (batched, cached 24 h).
+app.get('/api/destinations', async (_req, res) => {
+  const thumbs = await thumbnails(DESTINATIONS.map((d) => d.wiki), 640).catch(() => ({}));
+  res.json({
+    regions: REGIONS,
+    tags: TAGS,
+    destinations: DESTINATIONS.map((d) => ({ ...d, image: thumbs[d.wiki] || null })),
+  });
 });
 
 app.use('/api/places', placesRouter);

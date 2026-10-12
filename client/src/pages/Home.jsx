@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Sparkles, MapPinned, Utensils, Bath } from 'lucide-react';
+import { Sparkles, MapPinned, Utensils, Bath, Compass } from 'lucide-react';
 import SearchBar from '../components/SearchBar.jsx';
 import TopCities from '../components/TopCities.jsx';
 import { api, exploreUrl } from '../lib/api.js';
@@ -58,6 +58,11 @@ export default function Home({ ready }) {
           <p className="muted">Hover a card to fly the globe there · click to explore</p>
         </div>
         <TopCities cities={top.cities} source={top.source} onHover={setFocus} />
+        <div className="browse-all">
+          <button className="btn btn-soft btn-lg" onClick={() => navigate('/destinations')}>
+            <Compass size={18} /> Browse 100 travel destinations
+          </button>
+        </div>
       </section>
 
       <section className="section">
