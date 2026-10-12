@@ -85,6 +85,7 @@ export function useNearbyAll(center, radius) {
     };
     for (const k of AMENITY_KINDS) {
       out[k] = view(amen, (amen.data?.[k] || []).filter((p) => p.distance <= limit(k)));
+      out[k].source = amen.data?.source || null;
       if (k === 'food') out[k].cuisines = cuisineCounts(out[k].items);
     }
     return out;

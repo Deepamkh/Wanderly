@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { fetchJson, haversine, createRateGate, createLimiter, sleep } from '../utils/http.js';
+import { geoapifyAmenities, geoapifyKey } from './geoapify.js';
 
 const NOMINATIM = () => process.env.NOMINATIM_URL || 'https://nominatim.openstreetmap.org';
 
@@ -185,7 +186,7 @@ async function overpass(query) {
 const yes = (v) => v === 'yes' || v === 'only';
 
 function shape(kind, el, lat, lon) {
-  const c = el.type === 'node' ? { lat: el.lat, lon: el.lon } : el.center;
+  const c = el.center || (Number.isFinite(el.lat) && Number.isFinite(el.lon) ? { lat: el.lat, lon: el.lon } : null);
   if (!c) return null;
   const t = el.tags || {};
   const base = {
@@ -319,12 +320,26 @@ const round4 = (n) => Math.round(n * 1e4) / 1e4;
 export const bucketFor = (r) => BUCKETS.find((b) => b >= r) ?? BUCKETS[BUCKETS.length - 1];
 
 function filterTo(data, radius) {
-  const res = {};
+  const res = { source: data.source || 'osm' };
   for (const k of AMENITY_KINDS) {
     const r = Math.min(radius, CAPS[k]);
     res[k] = (data[k] || []).filter((p) => p.distance <= r);
   }
   return res;
+}
+
+/** Geoapify first when a key is set (fast, hosted); the public Overpass servers otherwise or as a fallback. */
+async function fetchAmenities(lat, lon, bucket) {
+  if (geoapifyKey()) {
+    try {
+      const caps = Object.fromEntries(AMENITY_KINDS.map((k) => [k, Math.min(bucket, CAPS[k])]));
+      return { source: 'geoapify', elements: await geoapifyAmenities(lat, lon, caps) };
+    } catch (e) {
+      console.warn(`[geoapify] failed (${e.status || e.name}: ${e.message}); falling back to Overpass`);
+    }
+  }
+  const raw = await overpass(buildQuery(lat, lon, bucket));
+  return { source: 'osm', elements: raw.elements || [] };
 }
 
 /**
@@ -344,9 +359,9 @@ export async function nearbyAll(lat, lon, radius) {
   if (!inFlight.has(flightKey)) {
     inFlight.set(
       flightKey,
-      overpass(buildQuery(lat, lon, bucket))
-        .then((raw) => {
-          const data = organise(raw.elements || [], lat, lon);
+      fetchAmenities(lat, lon, bucket)
+        .then(({ source, elements }) => {
+          const data = { ...organise(elements, lat, lon), source };
           const list = (areaCache.get(key) || []).filter((e) => e.radius > bucket);
           list.push({ radius: bucket, at: Date.now(), data });
           areaCache.delete(key); // keep most-recent order for the saved file
@@ -366,7 +381,7 @@ export async function nearbyAll(lat, lon, radius) {
     // Serve older results for this spot rather than an error, if we have any.
     const old = [...entries].sort((a, b) => b.radius - a.radius)[0];
     if (old) return { center: { lat, lon }, radius: Math.min(radius, old.radius), stale: true, ...filterTo(old.data, radius) };
-    throw Object.assign(new Error('Nearby places are busy loading from OpenStreetMap. Retrying shortly…'), { status: 503, expose: true });
+    throw Object.assign(new Error('Nearby places are busy loading. Retrying shortly…'), { status: 503, expose: true });
   }
 }
 

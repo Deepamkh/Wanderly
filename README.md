@@ -12,9 +12,9 @@ using **only free and open-source data, imagery, libraries and AI models** — n
 | Top 10 most visited cities | Euromonitor *Top 100 City Destinations Index 2025* (international arrivals) + Wikipedia thumbnails |
 | Header photo gallery | **Wikipedia / Wikimedia Commons** media |
 | Top attractions + adjustable radius | **Wikipedia GeoSearch** with photos, ranked by 30-day article views (real popularity); OpenStreetMap fallback for remote areas |
-| Nearest restaurants per cuisine | Overpass `amenity=restaurant/cafe/…` grouped by the `cuisine` tag, veg filter |
-| Nearest washrooms | Overpass `amenity=toilets` (free/paid, wheelchair, baby change) |
-| Parking spots | Overpass `amenity=parking` (type, fee, capacity) |
+| Nearest restaurants per cuisine | **Geoapify Places API** (free key, OpenStreetMap data) or Overpass fallback, grouped by cuisine, veg filter |
+| Nearest washrooms | Geoapify / Overpass `amenity=toilets` (free/paid, wheelchair, baby change) |
+| Parking spots | Geoapify / Overpass `amenity=parking` (type, fee, capacity) |
 | Map of everything nearby | `react-leaflet` + OpenStreetMap tiles (no API key) with a pastel tint, layer toggles |
 | Top reviews | Community reviews stored by the app (JSON file) with "helpful" voting |
 | Tips | **Wikivoyage** sections (Stay safe, Get around, Respect, …) |
@@ -117,6 +117,16 @@ These services are free because the community runs them — please be a good cit
 * **Map tiles** – OpenStreetMap's standard tiles are free for light use with attribution (no API key). For scale, self-host tiles
   (e.g. OpenMapTiles / Protomaps PMTiles) and set `VITE_TILE_URL` (and `VITE_TILE_ATTRIBUTION`) when building the client.
 * **Wikipedia / Wikivoyage / Commons** – content is CC BY-SA; attribution links are shown in the UI.
+
+## ⚡ Faster restaurants, washrooms & parking (Geoapify, free)
+
+1. Sign up at [geoapify.com](https://www.geoapify.com/) (free plan, no credit card) and create a project to get an API key.
+2. Add it to the server, **never to the code or GitHub**:
+   - **Locally:** `GEOAPIFY_API_KEY=your-key` in `server/.env`, then restart `npm run dev`.
+   - **Render:** service → *Environment* → add variable `GEOAPIFY_API_KEY` → *Save* (Render restarts).
+3. Each new area uses about 20 credits (cached for 12 hours), so the free 3,000 daily credits cover roughly
+   150 new areas a day. If Geoapify is unavailable or over quota, Wanderly falls back to the public Overpass servers.
+4. Lists show "Powered by Geoapify", as the free plan requires.
 
 ## ℹ️ Notes & limitations
 

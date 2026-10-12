@@ -95,6 +95,17 @@ export function Attractions({ state, center, city }) {
 // ---------------- Food by cuisine ----------------
 const KIND_LABEL = { restaurant: 'Restaurant', cafe: 'Café', fast_food: 'Fast food', food_court: 'Food court', pub: 'Pub', bar: 'Bar', ice_cream: 'Ice cream' };
 
+/** Data credit under amenity lists (Geoapify's free plan requires "Powered by Geoapify"). */
+export function SourceCredit({ source }) {
+  if (source !== 'geoapify') return null;
+  return (
+    <p className="source-note">
+      Powered by <a href="https://www.geoapify.com/" target="_blank" rel="noreferrer">Geoapify</a> · ©{' '}
+      <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap</a> contributors
+    </p>
+  );
+}
+
 /** "View all" link under a shortened list. */
 function ViewAll({ href, total, noun }) {
   if (!href) return null;
@@ -176,6 +187,7 @@ export function Food({ state, center, limit, viewAllHref, initialCuisine = 'all'
       </ul>
       {!list.length && <p className="notice">Nothing matches these filters.</p>}
       {limit && list.length > limit && <ViewAll href={href} total={list.length} noun={list.length === 1 ? 'restaurant' : 'restaurants'} />}
+      <SourceCredit source={state.source} />
     </>
   );
 }
@@ -210,6 +222,7 @@ export function Washrooms({ state, center, limit, viewAllHref }) {
         ))}
       </ul>
       {limit && state.items.length > limit && <ViewAll href={viewAllHref} total={state.items.length} noun="washrooms" />}
+      <SourceCredit source={state.source} />
     </>
   );
 }
@@ -245,6 +258,7 @@ export function Parking({ state, center, limit, viewAllHref }) {
         ))}
       </ul>
       {limit && state.items.length > limit && <ViewAll href={viewAllHref} total={state.items.length} noun="parking spots" />}
+      <SourceCredit source={state.source} />
     </>
   );
 }
