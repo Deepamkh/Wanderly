@@ -1,8 +1,8 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { Landmark, Utensils, Bath, Car, MessageSquareHeart, Lightbulb, ScrollText, Map as MapIcon, ArrowLeft } from 'lucide-react';
-import { api, slugify } from '../lib/api.js';
-import { useNearbyAll } from '../lib/useNearby.js';
+import { api, slugify, fmtDist } from '../lib/api.js';
+import { useNearbyAll, CAPS } from '../lib/useNearby.js';
 import SearchBar from '../components/SearchBar.jsx';
 import HeroGallery from '../components/explore/HeroGallery.jsx';
 import RadiusControl from '../components/explore/RadiusControl.jsx';
@@ -114,15 +114,15 @@ export default function Explore() {
             </Suspense>
           </Section>
 
-          <Section id="food" icon={Utensils} title="Restaurants by cuisine" subtitle={`Nearest 5 within ${Math.min(radius, 5000) / 1000} km`} tint="#fff4e8">
+          <Section id="food" icon={Utensils} title="Restaurants by cuisine" subtitle={`Nearest 5 within ${fmtDist(Math.min(radius, CAPS.food))}`} tint="#fff4e8">
             <Food state={food} center={center} limit={5} viewAllHref={viewAll('food')} />
           </Section>
 
           <div className="two-col">
-            <Section id="washrooms" icon={Bath} title="Nearest washrooms" subtitle={`Nearest 5 within ${Math.min(radius, 3000) / 1000} km`} tint="#ecfbf3">
+            <Section id="washrooms" icon={Bath} title="Nearest washrooms" subtitle={`Nearest 5 within ${fmtDist(Math.min(radius, CAPS.toilets))}`} tint="#ecfbf3">
               <Washrooms state={toilets} center={center} limit={5} viewAllHref={viewAll('toilets')} />
             </Section>
-            <Section id="parking" icon={Car} title="Parking spots" subtitle={`Nearest 5 within ${Math.min(radius, 5000) / 1000} km`} tint="#eef6ff">
+            <Section id="parking" icon={Car} title="Parking spots" subtitle={`Nearest 5 within ${fmtDist(Math.min(radius, CAPS.parking))}`} tint="#eef6ff">
               <Parking state={parking} center={center} limit={5} viewAllHref={viewAll('parking')} />
             </Section>
           </div>

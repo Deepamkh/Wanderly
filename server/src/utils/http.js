@@ -5,7 +5,19 @@ const UA = () =>
 const cache = new Map();
 const MAX_ENTRIES = 3000;
 
-export async function fetchJson(url, { method = 'GET', body, headers = {}, ttl = 3_600_000, timeout = 25_000, beforeNetwork } = {}) {
+function combineSignals(signals) {
+  const list = signals.filter(Boolean);
+  if (list.length <= 1) return list[0];
+  if (typeof AbortSignal.any === 'function') return AbortSignal.any(list);
+  const ctrl = new AbortController();
+  for (const s of list) {
+    if (s.aborted) ctrl.abort(s.reason);
+    else s.addEventListener('abort', () => ctrl.abort(s.reason), { once: true });
+  }
+  return ctrl.signal;
+}
+
+export async function fetchJson(url, { method = 'GET', body, headers = {}, ttl = 3_600_000, timeout = 25_000, beforeNetwork, signal } = {}) {
   const key = `${method} ${url} ${body ?? ''}`;
   const hit = cache.get(key);
   if (hit && hit.exp > Date.now()) return hit.data;
@@ -16,7 +28,7 @@ export async function fetchJson(url, { method = 'GET', body, headers = {}, ttl =
     method,
     body,
     headers: { 'User-Agent': UA(), Accept: 'application/json', ...headers },
-    signal: AbortSignal.timeout(timeout),
+    signal: combineSignals([AbortSignal.timeout(timeout), signal]),
   });
   if (!res.ok) {
     const err = new Error(`Upstream ${res.status} ${res.statusText}`);

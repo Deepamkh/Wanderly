@@ -1,5 +1,8 @@
 // OpenStreetMap services: Nominatim (geocoding) + Overpass (points of interest).
 // Both are free and keyless; please respect their usage policies (see README).
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { fetchJson, haversine, createRateGate, createLimiter, sleep } from '../utils/http.js';
 
 const NOMINATIM = () => process.env.NOMINATIM_URL || 'https://nominatim.openstreetmap.org';
@@ -57,8 +60,9 @@ export async function geocode(q, limit = 6) {
 
 export const KINDS = ['attractions', 'food', 'toilets', 'parking'];
 export const BUCKETS = [1000, 2000, 5000, 10000, 20000];
-// Food, washrooms and parking are only useful close by, so their radius is capped.
-export const CAPS = { attractions: 20000, food: 5000, toilets: 3000, parking: 5000 };
+// Food, washrooms and parking are only useful within walking/short-drive distance, so their radius is
+// capped. Smaller areas also make the query much faster in dense cities (work grows with area).
+export const CAPS = { attractions: 20000, food: 3000, toilets: 2000, parking: 3000 };
 const LIMITS = { attractions: 500, food: 700, toilets: 300, parking: 350 };
 const KEEP = { attractions: 120, food: 300, toilets: 120, parking: 120 };
 
@@ -85,46 +89,94 @@ function classify(tags = {}) {
 /** One combined query for all four kinds – a quarter of the load on the free servers. */
 function buildQuery(lat, lon, radius) {
   const around = (k) => `around:${Math.min(radius, CAPS[k])},${lat},${lon}`;
+  // `qt` skips sorting the output by ID (faster); a short server-side timeout fails fast so we can
+  // fall back to another mirror instead of waiting.
   return (
-    `[out:json][timeout:60];` +
-    KINDS.map((k, i) => `(${QUERIES[k](around(k))})->.s${i};.s${i} out center tags ${LIMITS[k]};`).join('')
+    `[out:json][timeout:25];` +
+    KINDS.map((k, i) => `(${QUERIES[k](around(k))})->.s${i};.s${i} out center tags qt ${LIMITS[k]};`).join('')
   );
 }
 
 // Mirrors that just failed are skipped for a while so we don't keep hammering them.
 const mirrorCooldown = new Map();
 
+// Remember which mirror answered fastest recently and try it first.
+const mirrorSpeed = new Map(); // url -> smoothed response time (ms)
+const HEDGE_AFTER_MS = 4000; // if no answer yet, also ask the next mirror
+
+async function askMirror(url, body, signal) {
+  const started = Date.now();
+  const data = await overpassLimit(() =>
+    fetchJson(url, {
+      method: 'POST',
+      body,
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      ttl: 0, // cached per area below
+      timeout: 30_000,
+      signal,
+    }),
+  );
+  // Overpass reports timeouts / memory limits inside a 200 response.
+  if (data.remark && /runtime error|timed out|out of memory|rate_limited/i.test(data.remark) && !(data.elements || []).length) {
+    throw Object.assign(new Error(`Overpass: ${data.remark}`), { status: 504 });
+  }
+  const took = Date.now() - started;
+  mirrorSpeed.set(url, mirrorSpeed.has(url) ? mirrorSpeed.get(url) * 0.6 + took * 0.4 : took);
+  return data;
+}
+
+/**
+ * "Hedged" request: ask the best mirror; if it hasn't answered within a few seconds, also ask the
+ * next one, and so on. The first good answer wins and the others are cancelled.
+ */
 async function overpass(query) {
   const body = `data=${encodeURIComponent(query)}`;
-  const mirrors = OVERPASS_MIRRORS();
-  const ready = mirrors.filter((m) => (mirrorCooldown.get(m) || 0) < Date.now());
-  const order = ready.length ? ready : mirrors;
-  let lastErr;
-  for (const [i, url] of order.entries()) {
-    try {
-      const data = await overpassLimit(() =>
-        fetchJson(url, {
-          method: 'POST',
-          body,
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          ttl: 0, // cached below, per area
-          timeout: 65_000,
-        }),
+  const all = OVERPASS_MIRRORS();
+  const ready = all.filter((m) => (mirrorCooldown.get(m) || 0) < Date.now());
+  const order = (ready.length ? ready : all).sort((a, b) => (mirrorSpeed.get(a) ?? 9e9) - (mirrorSpeed.get(b) ?? 9e9));
+  const ctrl = new AbortController();
+
+  return new Promise((resolve, reject) => {
+    let next = 0;
+    let pending = 0;
+    let done = false;
+    let lastErr;
+    let hedgeTimer;
+
+    const launch = () => {
+      if (done || next >= order.length) return;
+      const url = order[next++];
+      pending++;
+      clearTimeout(hedgeTimer);
+      hedgeTimer = setTimeout(launch, HEDGE_AFTER_MS);
+      askMirror(url, body, ctrl.signal).then(
+        (data) => {
+          if (done) return;
+          done = true;
+          clearTimeout(hedgeTimer);
+          mirrorCooldown.delete(url);
+          ctrl.abort(); // cancel the slower ones
+          resolve(data);
+        },
+        (e) => {
+          pending--;
+          if (done) return;
+          lastErr = e;
+          if (e.name !== 'AbortError') {
+            mirrorCooldown.set(url, Date.now() + (e.status === 429 ? 90_000 : 45_000));
+            console.warn(`[overpass] ${url} failed (${e.status || e.name}: ${e.message})`);
+          }
+          if (next < order.length) launch(); // failed fast → try the next one right away
+          else if (pending === 0) {
+            done = true;
+            clearTimeout(hedgeTimer);
+            reject(lastErr || new Error('Overpass unavailable'));
+          }
+        },
       );
-      // Overpass reports timeouts / memory limits inside a 200 response.
-      if (data.remark && /runtime error|timed out|out of memory|rate_limited/i.test(data.remark) && !(data.elements || []).length) {
-        throw Object.assign(new Error(`Overpass: ${data.remark}`), { status: 504 });
-      }
-      mirrorCooldown.delete(url);
-      return data;
-    } catch (e) {
-      lastErr = e;
-      mirrorCooldown.set(url, Date.now() + (e.status === 429 ? 90_000 : 45_000));
-      console.warn(`[overpass] ${url} failed (${e.status || e.name}: ${e.message})`);
-      if (i < order.length - 1) await sleep(600 * (i + 1));
-    }
-  }
-  throw lastErr || new Error('Overpass unavailable');
+    };
+    launch();
+  });
 }
 
 const yes = (v) => v === 'yes' || v === 'only';
@@ -231,6 +283,35 @@ const FRESH_MS = 12 * 3_600_000;
 const areaCache = new Map(); // "lat,lon" -> [{ radius, at, data }]
 const inFlight = new Map();
 
+// Saved to disk so popular places stay instant after a restart (most recent areas only).
+const CACHE_FILE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../data/area-cache.json');
+const PERSIST_MAX = 80;
+try {
+  for (const [k, list] of JSON.parse(fs.readFileSync(CACHE_FILE, 'utf8'))) areaCache.set(k, list);
+  console.log(`[overpass] loaded ${areaCache.size} saved areas`);
+} catch {
+  /* first run */
+}
+let saveTimer;
+export function persistAreaCache() {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    try {
+      fs.mkdirSync(path.dirname(CACHE_FILE), { recursive: true });
+      fs.writeFileSync(`${CACHE_FILE}.tmp`, JSON.stringify([...areaCache.entries()].slice(-PERSIST_MAX)));
+      fs.renameSync(`${CACHE_FILE}.tmp`, CACHE_FILE);
+    } catch (e) {
+      console.warn('[overpass] could not save cache:', e.message);
+    }
+  }, 2000);
+}
+
+/** True when this spot already has fresh results covering `radius`. */
+export function hasFreshArea(lat, lon, radius) {
+  const list = areaCache.get(`${round4(lat)},${round4(lon)}`) || [];
+  return list.some((e) => e.radius >= radius && Date.now() - e.at < FRESH_MS);
+}
+
 const round4 = (n) => Math.round(n * 1e4) / 1e4;
 export const bucketFor = (r) => BUCKETS.find((b) => b >= r) ?? BUCKETS[BUCKETS.length - 1];
 
@@ -265,8 +346,10 @@ export async function nearbyAll(lat, lon, radius) {
           const data = organise(raw.elements || [], lat, lon);
           const list = (areaCache.get(key) || []).filter((e) => e.radius > bucket);
           list.push({ radius: bucket, at: Date.now(), data });
+          areaCache.delete(key); // keep most-recent order for the saved file
           areaCache.set(key, list);
           if (areaCache.size > 500) areaCache.delete(areaCache.keys().next().value);
+          persistAreaCache();
           return data;
         })
         .finally(() => inFlight.delete(flightKey)),
@@ -289,4 +372,24 @@ export async function nearby(lat, lon, radius, kind) {
   if (!KINDS.includes(kind)) throw Object.assign(new Error(`Unknown kind "${kind}"`), { status: 400, expose: true });
   const all = await nearbyAll(lat, lon, radius);
   return { kind, radius, center: all.center, count: all[kind].length, items: all[kind] };
+}
+
+/**
+ * Warm the cache for popular places in the background, one at a time and politely spaced,
+ * so their pages open instantly. `after(point)` can do extra work (e.g. photos).
+ */
+export async function prewarm(points, radius = 5000, { gapMs = 5000, after } = {}) {
+  let warmed = 0;
+  for (const p of points) {
+    if (hasFreshArea(p.lat, p.lon, radius)) continue;
+    try {
+      await nearbyAll(p.lat, p.lon, radius);
+      if (after) await after(p);
+      warmed++;
+    } catch (e) {
+      console.warn(`[prewarm] ${p.name || `${p.lat},${p.lon}`}: ${e.message}`);
+    }
+    await sleep(gapMs);
+  }
+  return warmed;
 }

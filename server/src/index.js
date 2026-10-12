@@ -12,6 +12,8 @@ import { llmProvider } from './services/llm.js';
 import { thumbnails } from './services/wiki.js';
 import { TOP_CITIES, TOP_CITIES_SOURCE, GLOBE_PINS } from './data/cities.js';
 import { DESTINATIONS, REGIONS, TAGS } from './data/destinations.js';
+import { prewarm } from './services/osm.js';
+import { photosForArea } from './services/photos.js';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -68,4 +70,16 @@ app.use((err, _req, res, _next) => {
   });
 });
 
-app.listen(PORT, () => console.log(`✈  Wanderly API on http://localhost:${PORT}  (LLM: ${llmProvider()})`));
+app.listen(PORT, () => {
+  console.log(`✈  Wanderly API on http://localhost:${PORT}  (LLM: ${llmProvider()})`);
+
+  // Pre-load nearby places + photos for the top 10 cities so their pages open instantly.
+  // Runs quietly in the background, one city at a time. Set PREWARM=0 to turn off.
+  if (process.env.PREWARM !== '0') {
+    setTimeout(() => {
+      prewarm(TOP_CITIES, 5000, { after: (c) => photosForArea(c.lat, c.lon, 5000).catch(() => {}) })
+        .then((n) => n && console.log(`[prewarm] ready: ${n} cities`))
+        .catch(() => {});
+    }, 5000);
+  }
+});

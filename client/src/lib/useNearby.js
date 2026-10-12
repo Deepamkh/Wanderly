@@ -4,7 +4,7 @@ import { api } from './api.js';
 // Must match the server: one request per radius "bucket" covers every smaller radius,
 // so moving the slider down never triggers a new request.
 const BUCKETS = [1000, 2000, 5000, 10000, 20000];
-export const CAPS = { attractions: 20000, food: 5000, toilets: 3000, parking: 5000 };
+export const CAPS = { attractions: 20000, food: 3000, toilets: 2000, parking: 3000 };
 const KINDS = ['attractions', 'food', 'toilets', 'parking'];
 const RETRY_DELAYS = [3000, 8000, 15000];
 
@@ -51,6 +51,30 @@ export function useNearbyAll(center, radius) {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [areaKey, bucket, attempt]);
+
+  // Places show straight away; attraction photos are fetched separately and merged in when ready.
+  useEffect(() => {
+    const d = state.data;
+    if (!d || d.photosMerged || !d.attractions?.length || d.attractions.every((p) => p.image)) return;
+    let alive = true;
+    api
+      .attractionPhotos(d.center.lat, d.center.lon, d.radius)
+      .then(({ photos }) => {
+        if (!alive) return;
+        setState((s) =>
+          s.data !== d
+            ? s
+            : {
+                ...s,
+                data: { ...d, photosMerged: true, attractions: d.attractions.map((p) => (photos[p.id] ? { ...p, ...photos[p.id] } : p)) },
+              },
+        );
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [state.data]);
 
   // Automatic retries with back-off when the free servers are busy.
   useEffect(() => {
