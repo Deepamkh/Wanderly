@@ -466,6 +466,7 @@ input[type='range']::-moz-range-thumb { width: 16px; height: 16px; border-radius
 .google-reviews-host.is-loading { position: absolute; width: 1px; height: 1px; overflow: hidden; opacity: 0; }
 .skeleton.row.tall { height: 96px; }
 .notice.small { font-size: .86rem; }
+.notice.warn { border-style: solid; border-color: #ffd8a8; background: #fff8ef; color: #8a5420; margin-bottom: 14px; }
 .reviews-summary { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
 .big-score { font-family: var(--display); font-size: 2.4rem; color: var(--pink-d); }
 .stars { display: inline-flex; gap: 2px; }

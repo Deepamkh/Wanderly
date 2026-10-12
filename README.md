@@ -131,8 +131,12 @@ Without a key, the section shows Wanderly community reviews instead.
    (e.g. `https://your-site.onrender.com/*`, `http://localhost:5173/*`).
    *API restrictions:* the three APIs above.
 4. Set **quotas / budget alerts** in Cloud Console so usage stays within Google's free monthly allowance.
-5. Put the key in `client/.env` as `VITE_GOOGLE_MAPS_API_KEY=...` (local) or add the same environment
-   variable on Render, then rebuild / redeploy (it's read at build time).
+5. Give the key to the server as `GOOGLE_MAPS_API_KEY`:
+   - **Locally:** add `GOOGLE_MAPS_API_KEY=...` to `server/.env`, then restart `npm run dev`.
+   - **Render:** *Environment* → add `GOOGLE_MAPS_API_KEY` → save; Render restarts the service.
+   (Setting `VITE_GOOGLE_MAPS_API_KEY` in `client/.env` at build time also works.)
+6. Open a city page. If Google reviews still don't appear, the Top reviews section shows the reason
+   (no key, key rejected, API not enabled, or place not on Google).
 
 Google's pricing and terms change, so check the current
 [pricing page](https://developers.google.com/maps/billing-and-pricing/pricing) for the Places UI Kit SKUs.
