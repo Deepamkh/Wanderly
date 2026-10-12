@@ -7,7 +7,6 @@ import SearchBar from '../components/SearchBar.jsx';
 import HeroGallery from '../components/explore/HeroGallery.jsx';
 import RadiusControl from '../components/explore/RadiusControl.jsx';
 import Reviews from '../components/explore/Reviews.jsx';
-import GoogleReviews from '../components/explore/GoogleReviews.jsx';
 import { Section, Attractions, Food, Washrooms, Parking, Tips, History } from '../components/explore/Sections.jsx';
 
 const NearbyMap = lazy(() => import('../components/explore/NearbyMap.jsx'));
@@ -126,20 +125,8 @@ export default function Explore() {
             </Section>
           </div>
 
-          <Section
-            id="reviews"
-            icon={MessageSquareHeart}
-            title="Top reviews"
-            subtitle="Rating and reviews from Google"
-            tint="#fff0f4"
-          >
-            <GoogleReviews
-              name={data.title}
-              lat={data.place.lat}
-              lon={data.place.lon}
-              city={city}
-              fallback={<Reviews placeKey={slugify(data.title)} placeName={data.title} />}
-            />
+          <Section id="reviews" icon={MessageSquareHeart} title="Top reviews" subtitle="From the Wanderly community" tint="#fff0f4">
+            <Reviews placeKey={slugify(data.title)} placeName={data.title} />
           </Section>
 
           <Section id="tips" icon={Lightbulb} title="Traveller tips" tint="#fffbe6">

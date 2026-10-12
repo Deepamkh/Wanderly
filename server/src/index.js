@@ -24,13 +24,6 @@ app.use(express.json({ limit: '100kb' }));
 
 app.get('/api/health', (_req, res) => res.json({ ok: true, llm: llmProvider() }));
 
-// Public, browser-side settings. The Google Maps key is meant to be public (it's visible in any page
-// that uses Google Maps) – protect it with website restrictions in Google Cloud Console.
-app.get('/api/config', (_req, res) => {
-  res.set('Cache-Control', 'no-store');
-  res.json({ googleMapsKey: process.env.GOOGLE_MAPS_API_KEY || process.env.VITE_GOOGLE_MAPS_API_KEY || '' });
-});
-
 app.get('/api/cities/pins', (_req, res) => res.json(GLOBE_PINS));
 
 app.get('/api/cities/top', async (_req, res) => {

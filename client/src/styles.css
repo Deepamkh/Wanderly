@@ -457,14 +457,6 @@ input[type='range']::-moz-range-thumb { width: 16px; height: 16px; border-radius
 .dist { font-weight: 800; color: var(--ink-2); font-size: .9rem; }
 
 /* reviews */
-/* Google's Places UI Kit widget, framed to sit inside the pastel card. */
-.google-reviews { display: grid; gap: 10px; }
-.google-reviews-host gmp-place-details {
-  display: block; width: 100%; height: 560px; color-scheme: light;
-  border-radius: 16px; overflow: hidden; border: 1px solid var(--line); background: #fff;
-}
-.google-reviews-host.is-loading { position: absolute; width: 1px; height: 1px; overflow: hidden; opacity: 0; }
-.skeleton.row.tall { height: 96px; }
 .notice.small { font-size: .86rem; }
 .notice.warn { border-style: solid; border-color: #ffd8a8; background: #fff8ef; color: #8a5420; margin-bottom: 14px; }
 .reviews-summary { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }

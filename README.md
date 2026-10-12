@@ -16,7 +16,7 @@ using **only free and open-source data, imagery, libraries and AI models** — n
 | Nearest washrooms | Overpass `amenity=toilets` (free/paid, wheelchair, baby change) |
 | Parking spots | Overpass `amenity=parking` (type, fee, capacity) |
 | Map of everything nearby | `react-leaflet` + OpenStreetMap tiles (no API key) with a pastel tint, layer toggles |
-| Top reviews | **Google rating & reviews** via Google's Places UI Kit (needs your API key); falls back to Wanderly community reviews |
+| Top reviews | Community reviews stored by the app (JSON file) with "helpful" voting |
 | Tips | **Wikivoyage** sections (Stay safe, Get around, Respect, …) |
 | History & details | **Wikipedia** summary + History section |
 | AI trip planner | **Ollama** + open models (Llama 3.1, Qwen, Mistral…) grounded with real OSM places; automatic offline "smart planner" fallback |
@@ -118,33 +118,10 @@ These services are free because the community runs them — please be a good cit
   (e.g. OpenMapTiles / Protomaps PMTiles) and set `VITE_TILE_URL` (and `VITE_TILE_ATTRIBUTION`) when building the client.
 * **Wikipedia / Wikivoyage / Commons** – content is CC BY-SA; attribution links are shown in the UI.
 
-## ⭐ Google reviews (optional)
-
-City and attraction pages show Google's rating and reviews using Google's official **Places UI Kit**
-widget. It's the only Google option allowed on a page that also has a non-Google map (our OpenStreetMap map).
-Without a key, the section shows Wanderly community reviews instead.
-
-1. In [Google Cloud Console](https://console.cloud.google.com/), create a project and **link a billing account**
-   (Google requires one, even within the free monthly allowance).
-2. Enable **Maps JavaScript API**, **Places API (New)** and **Places UI Kit**.
-3. Create an API key → *Application restrictions: Websites* → add your domains
-   (e.g. `https://your-site.onrender.com/*`, `http://localhost:5173/*`).
-   *API restrictions:* the three APIs above.
-4. Set **quotas / budget alerts** in Cloud Console so usage stays within Google's free monthly allowance.
-5. Give the key to the server as `GOOGLE_MAPS_API_KEY`:
-   - **Locally:** add `GOOGLE_MAPS_API_KEY=...` to `server/.env`, then restart `npm run dev`.
-   - **Render:** *Environment* → add `GOOGLE_MAPS_API_KEY` → save; Render restarts the service.
-   (Setting `VITE_GOOGLE_MAPS_API_KEY` in `client/.env` at build time also works.)
-6. Open a city page. If Google reviews still don't appear, the Top reviews section shows the reason
-   (no key, key rejected, API not enabled, or place not on Google).
-
-Google's pricing and terms change, so check the current
-[pricing page](https://developers.google.com/maps/billing-and-pricing/pricing) for the Places UI Kit SKUs.
-
 ## ℹ️ Notes & limitations
 
-* **Reviews**: Google reviews need your own Google Maps Platform key (see above). Without one, or when Google has no match,
-  the page shows Wanderly's own community reviews. Move them to SQLite/Postgres when you outgrow the JSON file.
+* **Reviews**: there's no free, open source of Google or Tripadvisor reviews (both are paid and restrict reuse), so
+  Wanderly has its own community review system. Move it to SQLite/Postgres when you outgrow the JSON file.
 * POI completeness depends on OpenStreetMap coverage, which is excellent in most major cities and improving
   everywhere — contributing back at openstreetmap.org improves Wanderly too.
 * The top-10 list comes from Euromonitor's 2025 index; update `server/src/data/cities.js` when a new edition ships.
