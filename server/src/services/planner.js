@@ -1,6 +1,6 @@
 // AI trip planner. Grounds the LLM with real OpenStreetMap places, and falls back to a
 // deterministic "smart planner" when no model is reachable, so the feature always works for free.
-import { geocode, nearby } from './osm.js';
+import { geocode, nearbyAll } from './osm.js';
 import { chatJSON, llmProvider } from './llm.js';
 import { bearing, haversine } from '../utils/http.js';
 
@@ -46,15 +46,12 @@ function clampInput(body) {
 async function groundingData(destination) {
   const [place] = await geocode(destination, 1);
   if (!place) return { place: null, attractions: [], food: [] };
-  const radius = place.isArea ? 9000 : 4000;
-  const [a, f] = await Promise.allSettled([
-    nearby(place.lat, place.lon, radius, 'attractions'),
-    nearby(place.lat, place.lon, Math.min(radius, 4000), 'food'),
-  ]);
+  // One combined request; shares the cache with the city page.
+  const all = await nearbyAll(place.lat, place.lon, place.isArea ? 10000 : 5000).catch(() => null);
   return {
     place,
-    attractions: a.status === 'fulfilled' ? a.value.items : [],
-    food: f.status === 'fulfilled' ? f.value.items : [],
+    attractions: all?.attractions || [],
+    food: (all?.food || []).filter((f) => f.distance <= 4000),
   };
 }
 

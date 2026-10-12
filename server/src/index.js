@@ -58,13 +58,13 @@ if (fs.existsSync(dist)) {
 }
 
 app.use((err, _req, res, _next) => {
-  const status = err.status && err.status < 600 ? (err.status >= 500 || err.status === 429 ? 502 : err.status) : 500;
   console.error('[error]', err.message);
+  // Our own errors carry a user-facing message (expose: true); upstream failures get a friendly one.
+  if (err.expose) return res.status(err.status || 500).json({ error: err.message });
+  const upstream = err.status >= 500 || err.status === 429 || err.name === 'TimeoutError' || err.name === 'AbortError';
+  const status = upstream ? 502 : err.status && err.status < 600 ? err.status : 500;
   res.status(status).json({
-    error:
-      status === 502
-        ? 'A free data provider is busy right now. Please try again in a moment.'
-        : err.message || 'Something went wrong',
+    error: upstream ? 'A free data provider is busy right now. Please try again in a moment.' : err.message || 'Something went wrong',
   });
 });
 

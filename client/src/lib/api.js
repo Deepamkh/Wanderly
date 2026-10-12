@@ -13,6 +13,7 @@ export const api = {
   pins: () => req('/api/cities/pins'),
   topCities: () => req('/api/cities/top'),
   destinations: () => req('/api/destinations'),
+  nearbyAll: (lat, lon, radius) => req(`/api/places/nearby-all?${qs({ lat, lon, radius })}`),
   search: (q, signal) => req(`/api/places/search?${qs({ q })}`, { signal }),
   details: (params) => req(`/api/places/details?${qs(params)}`),
   nearby: (lat, lon, radius, kind) => req(`/api/places/nearby?${qs({ lat, lon, radius, kind })}`),

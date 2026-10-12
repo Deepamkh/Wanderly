@@ -24,7 +24,13 @@ export function Section({ id, icon: Icon, title, subtitle, children, tint }) {
 
 export function StateBlock({ state, empty }) {
   if (state.loading) return <div className="list-skeleton">{Array.from({ length: 4 }).map((_, i) => <div key={i} className="skeleton row" />)}</div>;
-  if (state.error) return <p className="notice error">{state.error}</p>;
+  if (state.error)
+    return (
+      <p className="notice error">
+        {state.error}{' '}
+        {state.retry && <button type="button" className="link-btn" onClick={state.retry}>Try again</button>}
+      </p>
+    );
   if (!state.items?.length) return <p className="notice">{empty}</p>;
   return null;
 }

@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { geocode, nearby } from '../services/osm.js';
+import { geocode, nearby, nearbyAll } from '../services/osm.js';
 import { resolveTitle, summary, images, history, travelTips, thumbnails, parseWikiTag } from '../services/wiki.js';
 
 const router = Router();
@@ -77,6 +77,32 @@ router.get('/details', async (req, res, next) => {
   }
 });
 
+async function addAttractionPhotos(items) {
+  const titles = items.map((p) => parseWikiTag(p.wikipedia)).filter((t) => t?.lang === 'en').map((t) => t.title);
+  const thumbs = await thumbnails(titles, 480).catch(() => ({}));
+  for (const p of items) {
+    const t = parseWikiTag(p.wikipedia);
+    p.image = t?.lang === 'en' ? thumbs[t.title] || null : null;
+  }
+}
+
+// GET /api/places/nearby-all?lat=..&lon=..&radius=5000
+// Attractions, food, washrooms and parking in ONE upstream request (radius is capped per kind).
+router.get('/nearby-all', async (req, res, next) => {
+  try {
+    const lat = num(req.query.lat);
+    const lon = num(req.query.lon);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return res.status(400).json({ error: 'lat & lon required' });
+    const radius = Math.round(Math.min(20000, Math.max(200, num(req.query.radius) || 2000)));
+    const data = await nearbyAll(lat, lon, radius);
+    await addAttractionPhotos(data.attractions);
+    res.set('Cache-Control', data.stale ? 'no-store' : 'public, max-age=600');
+    res.json(data);
+  } catch (e) {
+    next(e);
+  }
+});
+
 // GET /api/places/nearby?lat=..&lon=..&radius=2000&kind=attractions|food|toilets|parking
 router.get('/nearby', async (req, res, next) => {
   try {
@@ -87,14 +113,7 @@ router.get('/nearby', async (req, res, next) => {
     const kind = String(req.query.kind || 'attractions');
     const data = await nearby(lat, lon, radius, kind);
 
-    if (kind === 'attractions') {
-      const titles = data.items.map((p) => parseWikiTag(p.wikipedia)).filter((t) => t?.lang === 'en').map((t) => t.title);
-      const thumbs = await thumbnails(titles, 480).catch(() => ({}));
-      for (const p of data.items) {
-        const t = parseWikiTag(p.wikipedia);
-        p.image = t?.lang === 'en' ? thumbs[t.title] || null : null;
-      }
-    }
+    if (kind === 'attractions') await addAttractionPhotos(data.items);
     res.json(data);
   } catch (e) {
     next(e);

@@ -2,7 +2,7 @@ import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { Landmark, Utensils, Bath, Car, MessageSquareHeart, Lightbulb, ScrollText, Map as MapIcon, ArrowLeft } from 'lucide-react';
 import { api, slugify } from '../lib/api.js';
-import { useNearby } from '../lib/useNearby.js';
+import { useNearbyAll } from '../lib/useNearby.js';
 import SearchBar from '../components/SearchBar.jsx';
 import HeroGallery from '../components/explore/HeroGallery.jsx';
 import RadiusControl from '../components/explore/RadiusControl.jsx';
@@ -47,10 +47,7 @@ export default function Explore() {
   }, [key]);
 
   const center = useMemo(() => (data ? { lat: data.place.lat, lon: data.place.lon } : null), [data]);
-  const attractions = useNearby(center, radius, 'attractions');
-  const food = useNearby(center, radius && Math.min(radius, 5000), 'food', 900);
-  const toilets = useNearby(center, radius && Math.min(radius, 3000), 'toilets', 1300);
-  const parking = useNearby(center, radius && Math.min(radius, 5000), 'parking', 1700);
+  const { attractions, food, toilets, parking } = useNearbyAll(center, radius);
 
   if (error)
     return (
