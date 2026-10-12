@@ -49,18 +49,44 @@ export async function summary(title) {
 
 const JUNK_IMG = /(flag|logo|icon|map|locator|coat[_ ]of[_ ]arms|seal|symbol|signature|diagram|chart|emblem|blank|location)/i;
 
+// Wikimedia only serves thumbnails at standard widths (and never larger than the original),
+// so we ask the API for the proper URL instead of editing the size inside a link.
+const HEADER_WIDTH = 1280; // a standard Wikimedia thumbnail step
+const MIN_WIDTH = 800; // smaller photos look blurry in a full-width header
+const fileKey = (t) => t.replace(/^(File|Image):/i, '').replace(/_/g, ' ').trim().toLowerCase();
+
 export async function images(title, max = 8) {
   const url = `${wp()}/api/rest_v1/page/media-list/${encodeURIComponent(title.replace(/ /g, '_'))}`;
   const d = await fetchJson(url, { ttl: DAY });
+
+  const files = (d.items || [])
+    .filter((it) => it.type === 'image' && it.title && !/\.(svg|gif|tiff?)$/i.test(it.title) && !JUNK_IMG.test(it.title))
+    .sort((a, b) => (b.leadImage ? 1 : 0) - (a.leadImage ? 1 : 0)) // lead photo first
+    .slice(0, max + 8); // a few spares in case some are too small
+  if (!files.length) return [];
+
+  const titles = files.map((f) => (/^(File|Image):/i.test(f.title) ? f.title : `File:${f.title}`));
+  const info = await fetchJson(
+    `${wp()}/w/api.php?action=query&prop=imageinfo&iiprop=url|size|mime&iiurlwidth=${HEADER_WIDTH}` +
+      `&format=json&titles=${encodeURIComponent(titles.join('|'))}`,
+    { ttl: DAY },
+  );
+  const byFile = new Map();
+  for (const page of Object.values(info.query?.pages || {})) {
+    const ii = page.imageinfo?.[0];
+    if (ii) byFile.set(fileKey(page.title), ii);
+  }
+
   const out = [];
-  for (const it of d.items || []) {
-    if (it.type !== 'image' || !it.srcset?.length) continue;
-    if (/\.(svg|gif|tif|tiff)$/i.test(it.title) || JUNK_IMG.test(it.title)) continue;
-    let src = it.srcset[it.srcset.length - 1].src;
-    if (src.startsWith('//')) src = `https:${src}`;
-    // Ask for a header-friendly width instead of the thumbnail size.
-    src = src.replace(/\/(\d+)px-/, '/1600px-');
-    out.push({ src, caption: it.caption?.text || null, source: `https://commons.wikimedia.org/wiki/${encodeURIComponent(it.title)}` });
+  for (const f of files) {
+    const ii = byFile.get(fileKey(f.title));
+    if (!ii || ii.width < MIN_WIDTH || !/^image\/(jpeg|png|webp)$/.test(ii.mime)) continue;
+    out.push({
+      src: ii.thumburl || ii.url, // thumburl is the original when it's narrower than HEADER_WIDTH
+      width: Math.min(ii.width, HEADER_WIDTH),
+      caption: f.caption?.text || null,
+      source: ii.descriptionurl || `https://commons.wikimedia.org/wiki/${encodeURIComponent(f.title)}`,
+    });
     if (out.length >= max) break;
   }
   return out;

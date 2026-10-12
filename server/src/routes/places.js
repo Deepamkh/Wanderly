@@ -56,9 +56,8 @@ router.get('/details', async (req, res, next) => {
 
     const s = val(sum, null);
     const gallery = val(imgs, []);
-    if (s?.image && !gallery.some((g) => g.src.split('/').pop() === s.image.split('/').pop())) {
-      gallery.unshift({ src: s.image, caption: null, source: s.url });
-    }
+    // The page's lead photo is already first in the gallery; fall back to it only when the gallery is empty.
+    if (!gallery.length && s?.image) gallery.push({ src: s.image, caption: null, source: s.url });
 
     res.json({
       place,
