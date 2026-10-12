@@ -1,18 +1,15 @@
 {
-  "name": "wanderly-server",
+  "name": "wanderly",
   "version": "1.0.0",
   "private": true,
-  "type": "module",
-  "description": "Wanderly API – free/open-data travel backend (OSM, Wikipedia, Wikivoyage, local LLM)",
-  "main": "src/index.js",
-  "engines": { "node": ">=18.17" },
+  "description": "Wanderly – a one-stop, open-source travel web app (React + Node.js)",
   "scripts": {
-    "dev": "node --watch src/index.js",
-    "start": "node src/index.js"
+    "install:all": "npm install --prefix server && npm install --prefix client",
+    "dev": "concurrently -k -n api,web -c magenta,cyan \"npm run dev --prefix server\" \"npm run dev --prefix client\"",
+    "build": "npm run build --prefix client",
+    "start": "npm start --prefix server"
   },
-  "dependencies": {
-    "cors": "^2.8.5",
-    "dotenv": "^16.4.5",
-    "express": "^4.21.1"
+  "devDependencies": {
+    "concurrently": "^9.1.0"
   }
 }
